@@ -1,0 +1,38 @@
+default:
+  database:
+    server:
+      host: <host>
+      port: 5432
+      dbname: sars_cov_2
+      username: gisaid_importer
+      password: <password>
+  gisaid:
+    url: <gisaid api url>
+    username: <gisaid api username>
+    password: <gisaid api password>
+  gisaid_api_importer:
+    import_mode: append
+    update_submitter_information: true
+    workdir: /workdir
+    number_workers: 4
+    batch_size: 500
+    geo_location_rules_file: /app/gisaid_geoLocationRules.tsv
+  notification:
+    activated: true
+    type: smtp  # Possible values: smtp, sendmail (never tested/used), dropoff
+    # "sender" is only required if the type is set to smtp
+    sender:
+      smtp_host: mail.ethz.ch
+      smtp_port: 587
+      smtp_username: <username>
+      smtp_password: <password>
+      address: <email>
+    # dropoff_directory is only required if the type is set to dropoff
+    dropoff_directory: /mail_dropoff
+    recipients:
+      - <email1>
+      - <email2>
+  http_proxy:
+    activated: false
+    host: proxy.ethz.ch
+    port: 3128
