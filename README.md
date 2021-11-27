@@ -17,7 +17,7 @@ The microservices defined in `automation` are build on top of the `database` cod
 The infrastructure built by this code is hosted at ETH Zurich and the code is intended to be run on ETH servers.
 Thus, the code will not run out-of-the-box for external users.  
 
-GitHub actions automatically builds images for the code on the `main`-branch and pushes them to [GitHub packages](https://github.com/cevo-public/harvester-database-and-automation/pkgs/container/harvester). To build the images manually, the script [automation/build_and_push_all_images.sh](./automation/build_and_push_all_images.sh) can be used. Images are pulled from ETH servers, where they are continuously running.
+GitHub actions automatically builds images for the code on the `public`-branch and pushes them to [GitHub packages](https://github.com/cevo-public/harvester-database-and-automation/pkgs/container/harvester). To build the images manually, the script [automation/build_and_push_all_images.sh](./automation/build_and_push_all_images.sh) can be used. Images are pulled from ETH servers, where they are continuously running.
 
 Database access is governed by user-specific configuration files.
 

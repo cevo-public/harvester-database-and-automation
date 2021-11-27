@@ -3,7 +3,7 @@ name: Docker
 on:
   push:
     branches:
-      - main
+      - public
   schedule:
     - cron: '0 7 */2 * *'
 
