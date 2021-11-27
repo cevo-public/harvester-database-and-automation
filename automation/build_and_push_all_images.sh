@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Constants
-IMAGE_NAME=ghcr.io/cevo-public/harvester
+IMAGE_NAME=registry.ethz.ch/sars_cov_2/harvester-database-and-automation
 
 # Clean up
 rm -rf bag_meldeformular_importer/database
