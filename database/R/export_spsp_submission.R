@@ -391,9 +391,9 @@ format_metadata_for_spsp <- function(metadata, args) {
         sequencing_center == "h2030" ~ "H2030 Genome Center",
         sequencing_center == "viollier" ~ "Viollier AG"),
       reporting_authors = case_when(
-        covv_orig_lab == "labor team w AG" ~ seq_authors$teamw,
+        covv_orig_lab == "labor team w AG" ~ seq_authors$fgcz_teamw,
         sequencing_center == "gfb" ~ seq_authors$gfb,
-        sequencing_center %in% c("fgcz", "fcgz") ~ seq_authors$fgcz,
+        sequencing_center %in% c("fgcz", "fcgz") ~ seq_authors$fgcz_viollier,
         sequencing_center == "h2030" ~ seq_authors$h2030,
         sequencing_center == "viollier" ~ seq_authors$viollier),
       orig_fastq_name_forward = "to_assess")
