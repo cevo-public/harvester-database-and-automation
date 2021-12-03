@@ -14,7 +14,7 @@ from
       where m.aa_mutation in (
         -- Spike mutations as defined in
         -- https://github.com/phe-genomics/variant_definitions/blob/main/variant_yaml/pentagon-refining.yml
-        'S:G339D', 'S:S371P', 'S:S371F', 'S:S373P', 'S:K417N', 'S:N440K', 'S:G446S', 'S:S477N', 'S:E484A',
+        'S:G339D', 'S:S371L', 'S:S373P', 'S:K417N', 'S:N440K', 'S:G446S', 'S:S477N', 'S:E484A',
         'S:Q493R', 'S:G496S', 'S:Q498R', 'S:T547K', 'S:H655Y', 'S:N679K'
       )
       group by m.sample_name
