@@ -445,6 +445,7 @@ get_frameshift_diagnostics <- function(db_connection, metadata) {
     filter(sample_name %in% !! metadata$sample_name) %>%
     select(sample_name, indel_position, indel_diagnosis) %>%
     collect()
+  colnames(frameshifts_tbl)[which(colnames(frameshifts_tbl)=="indel_position")] <- "indel_position_english"
   n_seqs_with_frameshifts <- length(unique(frameshifts_tbl$sample_name))
 
   frameshift_summary <- frameshifts_tbl %>% group_by(indel_diagnosis) %>%
