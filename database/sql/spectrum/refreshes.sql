@@ -18,13 +18,13 @@ create user mv_refresher password '<password>';
 
 create or replace function refresh_all_mv() returns void security definer as $$
 begin
-  refresh materialized view concurrently spectrum_sequence_public_meta;
-  refresh materialized view concurrently spectrum_sequence_private_meta;
-  refresh materialized view concurrently spectrum_sequence_public_mutation_aa;
-  refresh materialized view concurrently spectrum_sequence_public_mutation_nucleotide;
-  refresh materialized view concurrently spectrum_sequence_intensity;
-  refresh materialized view concurrently spectrum_pangolin_lineage_mutation;
-  refresh materialized view concurrently spectrum_pangolin_lineage_mutation_nucleotide;
+--   refresh materialized view concurrently spectrum_sequence_public_meta;
+--   refresh materialized view concurrently spectrum_sequence_private_meta;
+--   refresh materialized view concurrently spectrum_sequence_public_mutation_aa;
+--   refresh materialized view concurrently spectrum_sequence_public_mutation_nucleotide;
+--   refresh materialized view concurrently spectrum_sequence_intensity;
+--   refresh materialized view concurrently spectrum_pangolin_lineage_mutation;
+--   refresh materialized view concurrently spectrum_pangolin_lineage_mutation_nucleotide;
   refresh materialized view concurrently spectrum_swiss_cases;
   refresh materialized view concurrently pangolin_lineage__rxiv_article;
   truncate spectrum_api_cache_sample;
