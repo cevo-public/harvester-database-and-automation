@@ -24,11 +24,11 @@ from
     (
       select nd.sample_name
       from consensus_sequence_nextclade_data nd
-      where nd.pangolin_lineage = 'B.1.1.529'
+      where nd.pangolin_lineage like 'B.1.1.529%' or nd.pangolin_lineage like 'BA%'
     )
   ) m
-  left join consensus_sequence cs on m.sample_name = cs.sample_name
+  join consensus_sequence cs on m.sample_name = cs.sample_name
   left join viollier_test vt on cs.ethid = vt.ethid
   left join sequence_identifier si on cs.sample_name = si.sample_name
   left join consensus_sequence_nextclade_data nd on cs.sample_name = nd.sample_name
-where vt.order_date >= '2021-08-01';
+where cs.sequencing_batch = '<missing>';
