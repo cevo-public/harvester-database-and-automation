@@ -1,11 +1,14 @@
 # Title     : Manually import team w metadata
-# Objective : This script imports metadata (from the same file sent to FGCZ) for labor team w samples for which we already recieved sequences. It will also assign ETHIDs to the samples.
+# Objective : This script imports metadata (from the same file Andreas sends to FGCZ) for labor team w samples for which we already recieved sequences. It will also assign ETHIDs to the samples.
+# Created by: nadeaus
 # Created on: 18.08.21
 
 require(dplyr)
 source("R/utility.R")
-source("R/secrets.R")
 db_connection <- open_database_connection("server")
+
+# Load team w metadata from the files they send to FGCZ
+metadata_dir <- "/Users/mcarrara/polybox/ETHZ-TeamW/metadata"
 
 #' Read in team w metadata.
 load_metadata <- function(file) {
@@ -56,7 +59,7 @@ load_revised_metadata <- function(file) {
 }
 
 is_first <- T
-for (file in list.files(path = team_w_metadata_dir, full.names = T)) {
+for (file in list.files(path = metadata_dir, full.names = T)) {
   print(paste("Reading metadata from", file))
   if (is_first) {
     metadata <- load_metadata(file)
@@ -79,9 +82,11 @@ sample_names <- dplyr::tbl(db_connection, "consensus_sequence") %>%
   select(sample_name, sequencing_batch) %>%
   collect()
 
-team_w_plate_name_lab_order_id_pattern <- "Y21[[:digit:]]{7}_2021[[:digit:]]{4}_21[[:digit:]]{8}_" 
-#OLD Ex: 2108028604_Y######### from 2108028604_Y#########_32033_S87
-#NEW Ex: Y#########_20210920_2109208604 from Y#########_20210920_2109208604_S17
+team_w_plate_name_lab_order_id_pattern <- "Y21[[:digit:]]{7}"
+#team_w_plate_name_lab_order_id_pattern <- "Y21[[:digit:]]{7}_2021[[:digit:]]{4}_21[[:digit:]]{8}_" 
+#OLD Ex: 2108028604_Y210959950 from 2108028604_Y210959950_32033_S87
+#NEW Ex: Y211178764_20210920_2109208604 from Y211178764_20210920_2109208604_S17
+#NEW Ex 12Dec: Y211643907
 
 sample_names_parsed <- sample_names %>%
   mutate(
@@ -93,12 +98,20 @@ sample_names_parsed <- sample_names %>%
     extra = "drop",
     fill = "right") %>%
   filter(!is.na(LabOrderId)) %>%
-  select(sample_name, sequencing_batch, PlateName, LabOrderId)
+#  select(sample_name, sequencing_batch, PlateName, LabOrderId)
+  select(sample_name, sequencing_batch, LabOrderId)
+
+#metadata_to_sample_name <- base::merge(
+#  x = metadata,
+#  y = sample_names_parsed,
+#  by = c("PlateName", "LabOrderId"),
+#  all.x = T,
+#  all.y = F)
 
 metadata_to_sample_name <- base::merge(
   x = metadata,
   y = sample_names_parsed,
-  by = c("PlateName", "LabOrderId"),
+  by = c("LabOrderId"),
   all.x = T,
   all.y = F)
 
