@@ -17,6 +17,9 @@ class Sample {
     public int getSampleNumber() {
         return sampleNumber;
     }
+    public int getTestID() {
+        return sequencingCenter + "/" + sampleNumber;
+    }
 
     public Sample setSampleNumber(int sampleNumber) {
         this.sampleNumber = sampleNumber;
