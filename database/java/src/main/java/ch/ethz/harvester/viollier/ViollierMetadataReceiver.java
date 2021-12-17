@@ -338,14 +338,14 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
 
     private Set<String> fetchAllExistingPlates(Connection conn) throws SQLException {
         String fetchSql = """
-            select viollier_plate_name
-            from viollier_plate;
+            select extraction_plate_id
+            from extraction_plate;
         """;
         Set<String> plates = new HashSet<>();
         try (Statement statement = conn.createStatement()) {
             try (ResultSet rs = statement.executeQuery(fetchSql)) {
                 while (rs.next()) {
-                    plates.add(rs.getString("viollier_plate_name"));
+                    plates.add(rs.getString("extraction_plate_id"));
                 }
             }
         }
@@ -370,7 +370,7 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
         StringWriter writer = new StringWriter();
         try {
             CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT
-                    .withHeader("ethid", "order_date", "ct", "viollier_plate_name", "well_position", "id_and_well"));
+                    .withHeader("ethid", "order_date", "ct", "extraction_plate_id", "well_position", "id_and_well"));
             for (Sample sample : samples) {
                 csvPrinter.printRecord(
                         sample.getSampleNumber(),
@@ -412,15 +412,15 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
     ) throws SQLException {
         conn.setAutoCommit(false);
 
-        // Add to viollier_test (if the sample is not already in the database)
+        // Add to test_metadata (if the sample is not already in the database)
         String insertVtSql = """
-            insert into viollier_test (sample_number, ethid, order_date, zip_code, city, canton, is_positive)
+            insert into test_metadata (test_id, ethid, order_date, zip_code, city, canton, is_positive)
             values (?, ?, ?, ?, ?, ?, true)
             on conflict do nothing;       
         """;
         try (PreparedStatement statement = conn.prepareStatement(insertVtSql)) {
             for (Sample sample : samples) {
-                statement.setInt(1, sample.getSampleNumber());
+                statement.setInt(1, sample.getTestID());
                 statement.setInt(2, sample.getSampleNumber());
                 statement.setDate(3, Date.valueOf(sample.getOrderDate()));
                 statement.setString(4, sample.getZipCode());
@@ -432,16 +432,16 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
             statement.clearBatch();
         }
 
-        // Add to viollier_plate
+        // Add to extraction_plate
         String insertVp = """
-            insert into viollier_plate (viollier_plate_name, left_viollier_date, sequencing_center, comment)
+            insert into extraction_plate (extraction_plate_id, left_viollier_date, sequencing_center, comment)
             values (?, ?, ?, 'The left_viollier_date might be inaccurate. It contains the date when we received the file which might not be the same date when the plate was extracted and sent.');
         """;
         try (PreparedStatement statement = conn.prepareStatement(insertVp)) {
             for (Map.Entry<String, String> plateAndSeqCenter : plateToSequencingCenter.entrySet()) {
                 String plate = plateAndSeqCenter.getKey();
                 String sequencingCenter = plateAndSeqCenter.getValue();
-                statement.setString(1, plate);
+                statement.setString(1, sequencingCenter + "/" + plate);
                 statement.setDate(2, Date.valueOf(LocalDate.now()));
                 statement.setString(3, sequencingCenter);
                 statement.addBatch();
@@ -450,9 +450,10 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
             statement.clearBatch();
         }
 
-        // Add to viollier_test_viollier_plate
+        // Add to test_plate_mapping
+        // TODO: update insertion value according to actual test_plate_mapping columns
         String insertVtvp = """
-            insert into viollier_test__viollier_plate (sample_number, viollier_plate_name, well_position, e_gene_ct, seq_request)
+            insert into test_plate_mapping (sample_number, extraction_plate_id, well_position, e_gene_ct, seq_request)
             values (?, ?, ?, ?, true);
         """;
         try (PreparedStatement statement = conn.prepareStatement(insertVtvp)) {
@@ -466,6 +467,7 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
             statement.executeBatch();
             statement.clearBatch();
         }
+        // TODO: insertion into sequencing_plate??
 
         conn.commit();
         conn.setAutoCommit(true);
