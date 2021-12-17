@@ -132,14 +132,17 @@ get_samples_to_release <- function(db_connection, args) {
     collect()
   
   print(log.info(
-    msg = "Checking if sequences have associated metadata in viollier_test or non_viollier_test.",
+    msg = "Checking if sequences have associated metadata in test_metadata.", #viollier_test or non_viollier_test.",
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
-  has_vt_metadata <- unlist(
-    dplyr::tbl(db_connection, "viollier_test") %>% select(ethid) %>% collect())
-  has_nvt_metadata <- unlist(
-    dplyr::tbl(db_connection, "non_viollier_test") %>% select(sample_name) %>% collect())
-  has_metadata <- all_db_seqs$ethid[(all_db_seqs$ethid %in% has_vt_metadata) | 
-    (all_db_seqs$sample_name %in% has_nvt_metadata)]
+  #has_vt_metadata <- unlist(
+  #  dplyr::tbl(db_connection, "viollier_test") %>% select(ethid) %>% collect())
+  #has_nvt_metadata <- unlist(
+  #  dplyr::tbl(db_connection, "non_viollier_test") %>% select(sample_name) %>% collect())
+  #has_metadata <- all_db_seqs$ethid[(all_db_seqs$ethid %in% has_vt_metadata) | 
+  #  (all_db_seqs$sample_name %in% has_nvt_metadata)]
+   has_test_metadata <- unlist(
+     dplyr::tbl(db_connection, "test_metadata") %>% select(ethid) %>% collect())
+   has_metadata <- all_db_seqs$ethid[(all_db_seqs$ethid %in% has_test_metadata)]
 
   print(log.info(
     msg = "Annotating sequences in database with reasons not to release, if any.",
@@ -155,7 +158,7 @@ get_samples_to_release <- function(db_connection, args) {
         !(sequencing_batch %in% finalized_batches) ~ "sequencing batch not finalized according to table sequencing_batch_status",
         dont_release ~ "column dont_release in consensus_sequence is true",
         ethid %in% released$ethid ~ "ethid already released or submitted",
-        !(ethid %in% has_metadata) ~ "no metadata in viollier_test or non_viollier_test",
+        !(ethid %in% has_metadata) ~ "no metadata in test_metadata",
         fail_reason == "no fail reason" & is.na(ethid) ~ "null ethid",
         fail_reason == "no fail reason" & duplicate_idx > 1 ~ "less complete duplicate",
         sample_name %in% seq_discrepencies$sample_name ~ "sequence discrepency between D-BSSE server and database",
@@ -254,16 +257,25 @@ get_sample_metadata <- function(db_connection, args, samples) {
     filter(sample_name %in% !! samples) %>%
     select(sample_name, ethid, coverage, sequencing_center, sequencing_batch, is_random)
 
-  query_viollier <- dplyr::tbl(db_connection, "viollier_test") %>%  # join sequence data to sample metadata using ethid
-    select(ethid, sample_number, order_date, zip_code) %>%
-    mutate(covv_orig_lab = "Viollier AG", covv_orig_lab_addr = "Hagmattstrasse 14, 4123 Allschwil")
+  #query_viollier <- dplyr::tbl(db_connection, "viollier_test") %>%  # join sequence data to sample metadata using ethid
+  #  select(ethid, sample_number, order_date, zip_code) %>%
+  #  mutate(covv_orig_lab = "Viollier AG", covv_orig_lab_addr = "Hagmattstrasse 14, 4123 Allschwil")
+  query_viollier <- dplyr::tbl(db_connection, "z_test_metadata") %>%  # join sequence data to sample metadata using ethid
+    select(ethid, test_id, order_date, zip_code) %>%
+    mutate(covv_orig_lab = "Viollier AG", covv_orig_lab_addr = "Hagmattstrasse 14, 4123 Allschwil", sample_number = test_id)
+  ###TODO: Here need to change the sample number so that it is a gsub of test_id. the line does not work
+    query_viollier %>% mutate(across(c(sample_number), ~ gsub( pattern=".*/", replacement="")))
+  #REFACTOR
   join_viollier <- left_join(x = query_seqs, y = query_viollier, by = "ethid")
   query_bag_sequence_report <- dplyr::tbl(db_connection, "bag_sequence_report") %>%
     select(auftraggeber_nummer, alt_seq_id, viro_purpose)
+  #REFACTOR
   join_viollier_w_reason <- left_join(  # merge in sequencing reason
     x = join_viollier,
     y = query_bag_sequence_report,
     by = c("sample_number" = "auftraggeber_nummer"))
+  #REFACTOR
+  #HERE NEED TO CHANGE THE SAMPLE-NUMBER IN BY WITH THE NEW VAR
 
   query_canton_code <- dplyr::tbl(db_connection, "swiss_postleitzahl") %>%  # get canton based on zip_code in metadata since canton is sometimes missing
     select(plz, canton) %>%
@@ -271,6 +283,9 @@ get_sample_metadata <- function(db_connection, args, samples) {
   join_canton <- left_join(x = join_viollier_w_reason, y = query_canton_code, by = "zip_code")
   viollier_metadata <- join_canton %>% collect()
 
+  #REFACTOR
+  #THIS SECTION SHOULD BE REDUNDANT UNLESS THE CHANGE FROM SAMPLE_NUMBER STILL MAKES A DIFFERENCE
+  #STILL TEST IN THE NEW DATABASE THE NEW VERSION TO BE SURE THAT THE CANTON PART DOES NOT MESS UP
   query_non_viollier <- dplyr::tbl(db_connection, "non_viollier_test") %>%  # merge in special sample metadata
     filter(sample_name %in% !! samples)
   join_canton_non_viollier <- left_join(x = query_non_viollier, y = query_canton_code, by = "zip_code")
@@ -284,6 +299,8 @@ get_sample_metadata <- function(db_connection, args, samples) {
       canton = coalesce(`canton.y`, `canton.x`)) %>%  # prefer canton matched from zip code, otherwise take from canton column if filled
     select(-c(`canton.y`, `canton.x`))
 
+  #REFACTOR
+  #POTENTIALLY THIS PART IS NOT NECCESARY, IF WE CAN WORK WITHOUT SPLITTING THE TWO THINGS
   seq_metadata <- coalesce_join(
     x = viollier_metadata, y = non_viollier_metadata, by = "sample_name", all = T)
 
@@ -317,6 +334,8 @@ qc_sample_metadata <- function(metadata, args) {
     metadata <- metadata %>%
       mutate(canton = tidyr::replace_na(data = canton, replace = "UN"))
   }
+  #REFACTOR
+  #CHANGE THIS PART WITH WHATEVER SUBSTITUTES THE SAMPLE NUMBER
   # Do we have any duplicate sequences of the same sample_number?
   temp <- metadata %>%
     collect %>%
@@ -384,6 +403,8 @@ format_metadata_for_spsp <- function(metadata, args) {
       reporting_lab_order_id = sample_name,
       collecting_lab_name = paste(covv_orig_lab, covv_orig_lab_addr, sep = "; "),
       collecting_lab_code = lab_code_foph,
+      #REFACTOR
+      #CHANGE THIS WITH WHATEVER IS SAMPLE NUMBER NOW
       collecting_lab_order_id = sample_number,
       sequencing_lab_name = case_when(
         sequencing_center == "gfb" ~ "Genomic Facility Basel",
@@ -445,6 +466,7 @@ get_frameshift_diagnostics <- function(db_connection, metadata) {
     filter(sample_name %in% !! metadata$sample_name) %>%
     select(sample_name, indel_position, indel_diagnosis) %>%
     collect()
+  colnames(frameshifts_tbl)[which(colnames(frameshifts_tbl)=="indel_position")] <- "indel_position_english"
   n_seqs_with_frameshifts <- length(unique(frameshifts_tbl$sample_name))
 
   frameshift_summary <- frameshifts_tbl %>% group_by(indel_diagnosis) %>%
