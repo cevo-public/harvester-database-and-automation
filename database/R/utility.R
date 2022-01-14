@@ -169,7 +169,7 @@ get_read_distribution <- function(
   # Get filepath for basecnt.tsv.gz
   readfile_info <- dplyr::tbl(db_connection, "consensus_sequence") %>%
     filter(sample_name == !! sample_name) %>%
-    select(ethid, sample_name, sequencing_batch, seq) %>%
+    select(ethid, sample_name, sequencing_batch, seq_aligned) %>%
     collect() %>%
     mutate(
       readfile = paste(
@@ -313,7 +313,7 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
                                  warn_outfile = NULL,
                                  table = "consensus_sequence",
                                  sample_name_col = "sample_name",
-                                 seq_col = "seq",
+                                 seq_col = "seq_aligned",
                                  mask_from_start = 0,
                                  mask_from_end = 0,
                                  gzip = F
@@ -570,7 +570,7 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
   if (is_ethid_format) {  # Check if ETHID is in the viollier_test table
     ethid <- unlist(strsplit(sample_name, split = "_"))[1]
     in_vt_once <- nrow(
-      dplyr::tbl(db_connection, "viollier_test") %>% 
+      dplyr::tbl(db_connection, "test_metadata") %>% 
         filter(ethid == !! ethid) %>% 
         collect()) == 1
     if (in_vt_once) {
@@ -579,6 +579,7 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
       warning(paste(ethid, "found 0 or > 1 times in the Viollier test table column 'ethid'. Invalid ETHID."))
       return(NA)
     }
+  ###FIXME: Uncertain about this. Need to still be fixed
   } else if (is_sample_number_format) {  # Check if sample number is in the viollier_test table
     ethid <- unlist(strsplit(sample_name, split = "_"))[1]
     in_vt_once <- nrow(
