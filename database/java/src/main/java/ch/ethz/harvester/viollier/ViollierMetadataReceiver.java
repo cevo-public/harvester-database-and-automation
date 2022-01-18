@@ -176,16 +176,19 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
                 Integer ct = Utils.nullableIntegerValue(csvRecord.get("CT Wert"));
                 String viollierPlateName = csvRecord.get("PlateID");
                 String wellPosition = csvRecord.get("DeepWellLocation");
-                String purposeEncoded = csvRecord.get("60997 wuha20");
                 String purpose = null;
-                if (purposeEncoded != null) {
-                    if (purposeEncoded.equals("res")) {
-                        purpose = "diagnostic";
-                    } else if (purposeEncoded.isBlank()) {
-                        purpose = "surveillance";
-                    } else {
-                        throw new RuntimeException("Unexpected value in the column \"60997 wuha20\": \"" + purposeEncoded + "\"");
+                try {
+                    String purposeEncoded = csvRecord.get("60997 wuha20");
+                    if (purposeEncoded != null) {
+                        if (purposeEncoded.equals("res")) {
+                            purpose = "diagnostic";
+                        } else if (purposeEncoded.isBlank()) {
+                            purpose = "surveillance";
+                        } else {
+                            throw new RuntimeException("Unexpected value in the column \"60997 wuha20\": \"" + purposeEncoded + "\"");
+                        }
                     }
+                } catch (IllegalArgumentException ignored) {
                 }
 
                 // The important metadata are only allowed to be missing if the whole row is actually empty.
