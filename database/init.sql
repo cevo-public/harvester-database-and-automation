@@ -509,6 +509,7 @@ create table viollier_test (
   canton text,
   pcr_code text,
   is_positive boolean not null,
+  purpose text,
   sequenced_by_viollier boolean not null default false,
   comment text
 );
