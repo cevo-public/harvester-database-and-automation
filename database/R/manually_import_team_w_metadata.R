@@ -8,7 +8,7 @@ source("R/utility.R")
 db_connection <- open_database_connection("server")
 
 # Load team w metadata from the files they send to FGCZ
-metadata_dir <- "/Users/mcarrara/polybox/ETHZ-TeamW/metadata"
+metadata_dir <- ""
 
 #' Read in team w metadata.
 load_metadata <- function(file) {
@@ -82,7 +82,7 @@ sample_names <- dplyr::tbl(db_connection, "consensus_sequence") %>%
   select(sample_name, sequencing_batch) %>%
   collect()
 
-team_w_plate_name_lab_order_id_pattern <- "Y21[[:digit:]]{7}"
+team_w_plate_name_lab_order_id_pattern <- "Y22[[:digit:]]{7}"
 #team_w_plate_name_lab_order_id_pattern <- "Y21[[:digit:]]{7}_2021[[:digit:]]{4}_21[[:digit:]]{8}_" 
 #OLD Ex: 2108028604_Y210959950 from 2108028604_Y210959950_32033_S87
 #NEW Ex: Y211178764_20210920_2109208604 from Y211178764_20210920_2109208604_S17
