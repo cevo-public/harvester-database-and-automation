@@ -8,6 +8,8 @@
 # Load requirements
 source("R/utility.R")
 source("R/logger.R")
+source("R/trigger_upload_on_euler.R")
+
 require(dplyr)
 require(yaml)
 require(argparse)
@@ -15,17 +17,18 @@ require(argparse)
 #' Generate SPSP submission files.
 #' @param args Program arguments.
 main <- function(args) {
-  make_outdir(args)
+  date <- make_outdir(args)
   db_connection <- connect_to_db(args)
   test_sampleset_dir(args)
   db_output <- get_samples_to_release(db_connection, args)
   if (length(db_output$samples) > 0) {
-    metadata <- get_sample_metadata(db_connection, args, db_output$samples)
+    raw_data_file_names <- upload_raw_data_files(db_output$samples, date)
+    metadata <- get_sample_metadata(db_connection, args, db_output$samples, raw_data_file_names)
     frameshifts_tbl <- get_frameshift_diagnostics(db_connection, metadata)
     write_out_files(metadata, frameshifts_tbl, db_output$summary, db_connection, args)
   } else {
     submission_dir <- paste(args$outdir, "for_submission/viruses", Sys.Date(), sep = "/")
-    system(command = paste("rm", submission_dir))
+    system(command = paste("rm -rf", submission_dir))
     print(log.info(
       msg = "No samples to release.",
       fcn = paste0(args$script_name, "::", "main")))
@@ -34,7 +37,8 @@ main <- function(args) {
 
 #' Create output directory.
 make_outdir <- function(args) {
-  submission_dir <- paste(args$outdir, "for_submission/viruses", Sys.Date(), sep = "/")
+  date <- Sys.Date()
+  submission_dir <- paste(args$outdir, "for_submission/viruses", date, sep = "/")
   sent_dir <- paste(args$outdir, "for_submission/sent", sep = "/")
   if (dir.exists(submission_dir)) {
     print(log.error(
@@ -48,6 +52,7 @@ make_outdir <- function(args) {
       msg = "Created outdir for submission files.",
       fcn = paste0(args$script_name, "::", "make_outdir")))
   }
+  return(date)
 }
 
 #' Connect to database.
@@ -130,7 +135,7 @@ get_samples_to_release <- function(db_connection, args) {
   released <- dplyr::tbl(db_connection, "sequence_identifier") %>%
     filter(!is.na(gisaid_uploaded_at) | !is.na(gisaid_id) | !is.na(spsp_uploaded_at)) %>%
     collect()
-  
+
   print(log.info(
     msg = "Checking if sequences have associated metadata in viollier_test or non_viollier_test.",
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
@@ -138,7 +143,7 @@ get_samples_to_release <- function(db_connection, args) {
     dplyr::tbl(db_connection, "viollier_test") %>% select(ethid) %>% collect())
   has_nvt_metadata <- unlist(
     dplyr::tbl(db_connection, "non_viollier_test") %>% select(sample_name) %>% collect())
-  has_metadata <- all_db_seqs$ethid[(all_db_seqs$ethid %in% has_vt_metadata) | 
+  has_metadata <- all_db_seqs$ethid[(all_db_seqs$ethid %in% has_vt_metadata) |
     (all_db_seqs$sample_name %in% has_nvt_metadata)]
 
   print(log.info(
@@ -246,7 +251,7 @@ report_null_ethids <- function(all_db_seqs_annotated, args) {
 }
 
 #' Query database to assemble sequence metadata.
-get_sample_metadata <- function(db_connection, args, samples) {
+get_sample_metadata <- function(db_connection, args, samples, raw_data_file_names) {
   print(log.info(
     msg = "Querying database for sample metadata.",
     fcn = paste0(args$script_name, "::", "get_sample_metadata")))
@@ -297,6 +302,24 @@ get_sample_metadata <- function(db_connection, args, samples) {
     rename(canton = canton_code, canton_fullname = english) %>%
     collect()
 
+  if (length(raw_data_file_names$r1_files) > 0) {
+    r1_files <- stack(raw_data_file_names$r1_files)
+    names(r1_files) <- c("orig_fastq_name_forward", "sample_name")
+    seq_metadata <- merge(x=seq_metadata, y=r1_files, by="sample_name", all.x=T)
+    seq_metadata$orig_fastq_name_forward[is.na(seq_metadata$orig_fastq_name_forward)] <- "to_assess"
+  }
+  else
+    seq_metadata$orig_fastq_name_forward <- "to_assess"
+
+  if (length(raw_data_file_names$r2_files) > 0) {
+    r2_files <- stack(raw_data_file_names$r2_files)
+    names(r2_files) <- c("orig_fastq_name_reverse", "sample_name")
+    seq_metadata <- merge(x=seq_metadata, y=r2_files, by="sample_name", all.x=T)
+    seq_metadata$orig_fastq_name_reverse[is.na(seq_metadata$orig_fastq_name_reverse)] <- "to_assess"
+  }
+  else
+    seq_metadata$orig_fastq_name_reverse <- "to_assess"
+
   metadata_w_canton <- merge(
     x = seq_metadata, y = canton_fullname, by = "canton", all.x = T)
 
@@ -311,9 +334,9 @@ qc_sample_metadata <- function(metadata, args) {
   # Are any sequences missing the Canton? If so, replace with "UN" for "unknown".
   missing_canton_info <- metadata %>% filter(is.na(canton))
   if (nrow(missing_canton_info) > 0) {
-    log.info(
+    print(log.info(
       msg = paste(nrow(missing_canton_info), "samples are missing Canton information. Replacing with 'UN' for 'unknown'."),
-      fcn = paste0(args$script_name, "::", "qc_sample_metadata"))
+      fcn = paste0(args$script_name, "::", "qc_sample_metadata")))
     metadata <- metadata %>%
       mutate(canton = tidyr::replace_na(data = canton, replace = "UN"))
   }
@@ -323,11 +346,11 @@ qc_sample_metadata <- function(metadata, args) {
     group_by(sample_number) %>%
     filter(n() > 1)
   if (nrow(temp) > 0 & !all(is.na(temp$sample_number))) {
-    notify.error(
+      print(notify.error(
       msg = paste(
         "Some sequences associated with same sample_number:",
-        format_dataframe_for_log(temp %>% select(sample_name, ethid)), sep = "\n"),
-      fcn = paste0(args$script_name, "::", "qc_sample_metadata"))
+        format_dataframe_for_log(temp %>% ungroup() %>% select(sample_name, ethid)), sep = "\n"),
+      fcn = paste0(args$script_name, "::", "qc_sample_metadata")))
       stop()
   }
   # Do we have any duplicate sequences of the same ethid?
@@ -336,12 +359,12 @@ qc_sample_metadata <- function(metadata, args) {
     group_by(ethid) %>%
     filter(n() > 1)
   if (nrow(temp) > 0) {
-    notify.error(
+    print(notify.error(
       msg = paste(
         "Some sequences associated with same ethid:",
-        format_dataframe_for_log(temp %>% select(sample_name, ethid)), sep = "\n"),
-      fcn = paste0(args$script_name, "::", "qc_sample_metadata"))
-    stop()
+        format_dataframe_for_log(temp %>% ungroup() %>% select(sample_name, ethid)), sep = "\n"),
+      fcn = paste0(args$script_name, "::", "qc_sample_metadata")))
+     stop()
   }
   return(metadata)
 }
@@ -396,7 +419,9 @@ format_metadata_for_spsp <- function(metadata, args) {
         sequencing_center %in% c("fgcz", "fcgz") ~ seq_authors$fgcz_viollier,
         sequencing_center == "h2030" ~ seq_authors$h2030,
         sequencing_center == "viollier" ~ seq_authors$viollier),
-      orig_fastq_name_forward = "to_assess")
+      orig_fastq_name_forward = orig_fastq_name_forward,
+      orig_fastq_name_reverse = orig_fastq_name_reverse,
+    )
   rownames(metadata_for_spsp) <- metadata$sample_name
   return(metadata_for_spsp)
 }
@@ -456,7 +481,7 @@ get_frameshift_diagnostics <- function(db_connection, metadata) {
   frameshifts_tbl <- merge(
     x = frameshifts_tbl,
     y = metadata[c("sample_name", "strain_name")],
-    all.x = T, by = "sample_name") 
+    all.x = T, by = "sample_name")
   return(frameshifts_tbl)
 }
 
