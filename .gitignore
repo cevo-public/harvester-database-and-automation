@@ -1,3 +1,6 @@
 .idea/
 database/config.yml
 .gradle/
+
+# vim backup files:
+.*.sw?
