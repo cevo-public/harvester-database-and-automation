@@ -67,7 +67,7 @@ def import_sequences(data_dir, db_host, db_name, db_user, db_password, sample_na
             batch_to_import = os.listdir(path=data_dir + "/" + sample_name)[0]  # take sequences from 1st available batch -- you may want to specify a different batch folder in the event of a re-run
         else:
             batch_to_import = batch
-        seq_file = data_dir + "/" + sample_name + "/" + batch_to_import + "/references/ref_majority_dels.fasta"
+        seq_file = data_dir + "/" + sample_name + "/" + batch_to_import + "/references/consensus.bcftools.fasta"
         seqs = SeqIO.parse(seq_file, "fasta")
         try:
             for record in seqs:
