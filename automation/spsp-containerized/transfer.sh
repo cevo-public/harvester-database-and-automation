@@ -24,7 +24,7 @@ echo "[$(ts)] Adding the SPSP SFTP server to the list of known hosts for SSH."
 
 mkdir -p $HOME/.ssh
 if ! ssh-keyscan spsp.sib.swiss > $HOME/.ssh/known_hosts 2>/dev/null; then
-	echo "[$(ts)] ssh-keyscan spsp.sib.swiss failed, are you in BSSE vpz?"
+	echo "[$(ts)] ssh-keyscan spsp.sib.swiss failed, are you in BSSE vpn?"
 	exit 1
 fi
 
