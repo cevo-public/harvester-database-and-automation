@@ -4,7 +4,6 @@
 
 # TODO: automatically update improved sequences?
 # TODO: programatically fill in V-pipe version, sequencing methods, library prep kit to database - here the latter 2 are hardcoded to known truth as of 24.01.2022
-##### TODO: all lines commented with 5 "#" characters are related to the new report of the frameshifts to SPSP. These changes are tested and functional, but there's the need to change the java wrapper accordingly and to have confirmations about the frameshift tables
 
 # Load requirements
 source("R/utility.R")
@@ -16,6 +15,20 @@ require(argparse)
 #' Generate SPSP submission files.
 #' @param args Program arguments.
 main <- function(args) {
+    print(log.info(
+    msg = paste("args workingdir", args$workingdir),
+    fcn = paste0(args$script_name, "::", "debug")))
+  if (!(dir.exists(args$workingdir))) {
+    print(log.error(
+      msg = paste("Specified workingdir", args$samplesetdir, "does not exist."),
+      fcn = paste0(args$script_name, "::", "debug")))
+    stop()
+  } else {
+    print(log.info(
+      msg = "Checked that samplesetdir exists.",
+      fcn = paste0(args$script_name, "::", "debug")))
+  }
+
   make_outdir(args)
   db_connection <- connect_to_db(args)
   test_sampleset_dir(args)
@@ -374,7 +387,7 @@ format_metadata_for_spsp <- function(metadata, args) {
         viro_purpose %in% c("outbreak", "travel case", "screening", "surveillance") ~"Screening", # SPSP vocabulary distinguishes only between Screening, Clinical signs of infection, Re-infection, Infection after vaccination, Unknown, Other as of 27.05.21
         TRUE ~ "Other"),
       library_preparation_kit = case_when(
-        sequencing_center == "viollier" ~ "Illumina_COVIDSeq (ARTIC V3)",
+        sequencing_center == "viollier" ~ "Illumina_COVIDSeq (ARTIC V4)",
         sequencing_center == "gfb" ~ "NEB (ARTIC V3)",
         sequencing_center == "h2030" ~ "Illumina_COVIDSeq (ARTIC V4)",
         sequencing_center == "fgcz" & as.Date(
@@ -450,22 +463,31 @@ get_frameshift_diagnostics <- function(db_connection, metadata, args) {
     select(sample_name, indel_position, indel_diagnosis) %>%
     collect()
 
-#####  without_frameshifts <- metadata %>% filter(!sample_name %in% !! frameshifts_tbl$sample_name) %>% select(sample_name) %>% collect()
-#####  missing_table <- NULL
-#####  for (sample in without_frameshifts$sample_name) {
-#####    missing_table <- c(missing_table, test_frameshift_table(sample, args))
-#####  }
-#####  if (!is.null(missing_tables)) {
-#####    notify.error(
-#####      msg = paste(
-#####        "No framshift table in sequence:",
-#####        missing_table, sep = "\n"),
-#####      fcn = paste0(args$script_name, "::", "without_frameshifts"))
-#####    stop(paste("Fatal: Frameshift table does not exist for the following samples\n", missing_samples))
-#####  }
+  without_frameshifts <- metadata %>% filter(!sample_name %in% !! frameshifts_tbl$sample_name) %>% select(sample_name) %>% collect()
+  missing_table <- NULL
+  
+  print(log.info(
+    msg = "Testing if samples without frameshifts have a report available.",
+    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
+  
+  for (sample in without_frameshifts$sample_name) {
+    missing_table <- c(missing_table, test_frameshift_table(sample, args, db_connection))
+  }
+  if (!is.null(missing_table)) {
+    print(log.error(
+      msg = paste(
+        "No frameshift table in sequence:",
+        missing_table, sep = "\n"),
+      fcn = paste0(args$script_name, "::", "without_frameshifts")))
+    stop(paste("Fatal: Frameshift table does not exist for the following samples\n", missing_table))
+  }
   
   colnames(frameshifts_tbl)[which(colnames(frameshifts_tbl)=="indel_position")] <- "indel_position_english"
   n_seqs_with_frameshifts <- length(unique(frameshifts_tbl$sample_name))
+
+  print(log.info(
+    msg = "Building the frameshift summary and table.",
+    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
 
   frameshift_summary <- frameshifts_tbl %>% group_by(indel_diagnosis) %>%
     summarize(n_dels = n()) %>%
@@ -474,26 +496,30 @@ get_frameshift_diagnostics <- function(db_connection, metadata, args) {
   frameshifts_tbl <- merge(
     x = frameshifts_tbl,
     y = metadata[c("sample_name", "strain_name")],
-    all.x = T, by = "sample_name")
-#####    all.x = T, all.y = T, by = "sample_name") 
+    all.x = T, all.y = T, by = "sample_name") 
 
-#####  frameshifts_tbl <- frameshifts_tbl %>%
-#####    mutate(indel_position_english = tidyr::replace_na(data = indel_position_english, replace = "no frameshifts found in this sequence"))
+  frameshifts_tbl <- frameshifts_tbl %>%
+    mutate(indel_position_english = tidyr::replace_na(data = indel_position_english, replace = "no frameshifts found in this sequence"))
   return(frameshifts_tbl)
 }
 
-######' Check if the samples without frameshifts have an associated framshift table
-#####test_frameshift_table <- function(mysample, args) {
-#####  sample_batch <- dplyr::tbl(db_connection, "consensus_sequence") %>%
-#####    filter(sample_name %in% !! mysample) %>%
-#####    select(sample_name, sequencing_batch) %>% collect()
-#####
-#####  if (!(file.exists(paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv")))) {
-#####    return(mysample)
-#####  } else{
-#####    return(NULL)
-#####  }
-#####}
+#' Check if the samples without frameshifts have an associated framshift table
+test_frameshift_table <- function(mysample, args, db_connection) {
+  
+  sample_batch <- dplyr::tbl(db_connection, "consensus_sequence") %>%
+    filter(sample_name %in% !! mysample) %>%
+    select(sample_name, sequencing_batch) %>% collect()
+  
+  print(log.info(
+    msg = paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv"),
+    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
+
+  if (!(file.exists(paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv")))) {
+    return(mysample)
+  } else{
+    return(NULL)
+  }
+}
 
 
 #' Write out files for submission to SPSP.
@@ -539,7 +565,7 @@ parser <- argparse::ArgumentParser()
 parser$add_argument("--config", type = "character", help = "Path to spsp-config.yml.", default = "spsp-config.yml")
 parser$add_argument("--samplesetdir", type = "character", help = "Path to V-pipe sample directories.", default = "/mnt/pangolin/sampleset")
 parser$add_argument("--outdir", type = "character", help = "Path to output files for submission.", default = paste("/mnt/pangolin/consensus_data_for_release/spsp_submission", Sys.Date(), sep = "/"))
-#####parser$add_argument("--workingdir", type = "character", help = "Path to V-pipe working directory.", default = "/mnt/pangolin/working")
+parser$add_argument("--workingdir", type = "character", help = "Path to V-pipe working directory.", default = "/mnt/pangolin/working")
 args <- parser$parse_args()
 args[["script_name"]] <- "export_spsp_submission.R"
 
