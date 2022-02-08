@@ -21,3 +21,11 @@ mandatory_metadata_columns:
   collecting_lab_order_id
   reporting_authors
   orig_fastq_name_forward
+raw_data_upload:
+  server:
+  user:
+  uploads_folder:
+  private_key_euler:
+  passphrase:
+  max_conn: 10
+  max_samples_per_call: 200

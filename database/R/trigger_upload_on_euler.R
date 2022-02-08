@@ -1,37 +1,47 @@
 library(sys)
 
+source("R/logger.R")
 
-SERVER <- "euler.ethz.ch"
-USER <- "[USER]"
-UPLOADS_FOLDER <- "/cluster/project/pangolin/working/uploads"
-PRIVATE_KEY_EULER <- "id_ed25519_euler"
-PASSPHRASE <- "[TOBEFILLEDIN]"
-
-MAX_CONN <- 10
-MAX_SAMPLES_PER_CALL <- 200
 
 SSH <- Sys.which("ssh")
 
-upload_raw_data_files <- function(samples, date) {
+upload_raw_data_files <- function(samples, date, config) {
+
+    log <- function(msg) {
+        print(log.info(msg=msg, fcn="trigger_upload_on_euler::upload_raw_data_files"))
+    }
+
+    max_conn <- config$max_conn
+    max_samples_per_call <- config$max_samples_per_call
 
     n_samples <- length(samples)
 
     r1_files <- list()
     r2_files <- list()
 
-    n_chunks <- ceiling(length(samples) / MAX_SAMPLES_PER_CALL)
+    n_chunks <- ceiling(n_samples / max_samples_per_call)
+
+    log(paste("start upload of raw data files of",
+              n_samples,
+              "files in",
+              n_chunks,
+              "chunks")
+    )
+
     chunks <- split(1:n_samples, (1:n_samples) %% n_chunks)
-    pids <- rep(-1, MAX_CONN);
-    std_outs <- rep(-1, MAX_CONN);
-    std_errs <- rep(-1, MAX_CONN);
+    pids <- rep(-1, max_conn);
+    std_outs <- rep(-1, max_conn);
+    std_errs <- rep(-1, max_conn);
 
     for (i in 1:length(chunks)) {
 
-        j <- (i %% MAX_CONN) + 1
+        j <- (i %% max_conn) + 1
 
         # if connection j was spawned already, wait for finish:
         if (pids[j] > -1) {
+            log("wait for ssh process to finish")
             exec_status(pids[j], wait=TRUE)
+            log("collect results from ssh process")
             results <- collect_results(std_outs[j], std_errs[j])
             r1_files <- c(r1_files, results$r1_files)
             r2_files <- c(r2_files, results$r2_files)
@@ -39,17 +49,20 @@ upload_raw_data_files <- function(samples, date) {
         }
 
         chunk <- samples[unlist(chunks[i])]
-        handle <- spawn_ssh_process(date, chunk)
+        log("spawn ssh process")
+        handle <- spawn_ssh_process(config, date, chunk)
         pids[j] <- handle$pid
         std_outs[j] <- handle$stdout
         std_errs[j] <- handle$stderr
     }
 
     # collect remaining results
-    for (j in 1:MAX_CONN) {
+    for (j in 1:max_conn) {
         if (pids[j] > -1) {
+            log("wait for ssh process to finish")
             exec_status(pids[j], wait=TRUE)
             results <- collect_results(std_outs[j], std_errs[j])
+            log("collect results from ssh process")
             r1_files <- c(r1_files, results$r1_files)
             r2_files <- c(r2_files, results$r2_files)
             pids[j] <- -1;
@@ -59,15 +72,24 @@ upload_raw_data_files <- function(samples, date) {
 }
 
 
-spawn_ssh_process <- function(date, samples)
+
+
+
+spawn_ssh_process <- function(config, date, samples)
 {
-    args = c(paste0(USER, "@", SERVER),
-                "-i", PRIVATE_KEY_EULER,
+    server <- config$server
+    user <- config$user
+    uploads_folder <- config$uploads_folder
+    private_key_euler <- config$private_key_euler
+    passphrase <- config$passphrase
+
+    args = c(paste0(user, "@", server),
+                "-i", private_key_euler,
                 "-o", "StrictHostKeyChecking=accept-new",
                 "spsp",
-                UPLOADS_FOLDER,
+                uploads_folder,
                 date,
-                PASSPHRASE,
+                passphrase,
                 samples
             )
     std_out <- tempfile()

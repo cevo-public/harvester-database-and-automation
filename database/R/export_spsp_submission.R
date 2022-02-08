@@ -22,7 +22,8 @@ main <- function(args) {
   test_sampleset_dir(args)
   db_output <- get_samples_to_release(db_connection, args)
   if (length(db_output$samples) > 0) {
-    raw_data_file_names <- upload_raw_data_files(db_output$samples, date)
+    config <- read_yaml(file = args$config)
+    raw_data_file_names <- upload_raw_data_files(db_output$samples, date, config$raw_data_upload)
     metadata <- get_sample_metadata(db_connection, args, db_output$samples, raw_data_file_names)
     frameshifts_tbl <- get_frameshift_diagnostics(db_connection, metadata)
     write_out_files(metadata, frameshifts_tbl, db_output$summary, db_connection, args)
@@ -178,6 +179,7 @@ get_samples_to_release <- function(db_connection, args) {
     msg = paste("Found", nrow(to_release), "sequences in database to release."),
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
   output <- list("samples" = to_release$sample_name, "summary" = fail_reason_summary)
+  print(output)
   return(output)
 }
 
@@ -523,6 +525,57 @@ write_out_files <- function(metadata, frameshifts_tbl, batches_summary, db_conne
     gzip = T)
 }
 
+check_raw_data_upload_config <- function(config) {
+    required <- c("server", "user", "uploads_folder", "private_key_euler",
+                  "passphrase", "max_conn", "max_samples_per_call")
+
+
+    missing <- setdiff(required, names(config))
+    unknown <- setdiff(names(config), required)
+
+    errors <- 0
+    if (length(missing) > 0) {
+        cat(paste(c("error: the following entries in config are missing:", missing, "\n")))
+        errors <- errors + 1
+    }
+    if (length(unknown) > 0) {
+        cat(paste(c("error: the following entries in config are not known:", unknown, "\n")))
+        errors <- errors + 1
+    }
+
+
+    for (name in required) {
+        value <- config[name]
+        if (is.null(value))
+            next
+        if (length(config[name]) == 0) {
+            cat(paste("error: config entry for", name, "is empty\n"))
+            errors <- errors + 1
+        }
+    }
+
+    for (num_field in c("max_conn", "max_samples_per_call")) {
+        value <- config[name]
+        if (is.null(value))
+            next
+        value <- suppressWarnings(as.integer(value));
+        if (is.na(value)) {
+            cat(paste("error: config entry for", num_filed, "is not an integer number\n"))
+            errors <- errors + 1
+            next
+        }
+        config[num_field] <- value
+    }
+    if (errors > 0)
+        stop("config not valid")
+}
+
+check_config <- function(config_file) {
+    config <- read_yaml(file = config_file)
+    check_raw_data_upload_config(config$raw_data_upload)
+}
+
+
 # Production arguments
 parser <- argparse::ArgumentParser()
 parser$add_argument("--config", type = "character", help = "Path to spsp-config.yml.", default = "spsp-config.yml")
@@ -537,6 +590,8 @@ args[["script_name"]] <- "export_spsp_submission.R"
 # args[["samplesetdir"]] <- "/Volumes/covid19-pangolin/backup/sampleset"
 # args[["outdir"]] <- "~/Downloads/test_outdir"
 # args[["script_name"]] <- "export_spsp_submission.R"
+
+check_config(args$config)
 
 # Run program
 main(args = args)
