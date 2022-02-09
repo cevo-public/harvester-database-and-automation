@@ -1,9 +1,2 @@
-.idea/
-database/config.yml
-.gradle/
-database/R/secrets.R
-database/R/copy_fastqs_to_viollier_sftp_run.R
-
-
-# vim backup files:
+# vim backup files
 .*.sw?

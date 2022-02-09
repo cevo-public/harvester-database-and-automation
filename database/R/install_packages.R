@@ -20,6 +20,7 @@ install_on_error_or_warning <- function() {
     install.packages("cellranger", lib = lib_loc)
     install.packages("BiocManager", lib = lib_loc)
     BiocManager::install("Biostrings", lib = lib_loc)
+    install.packages("sys")
 
   } else {
     print("Couldn't find a different library specified in environment variable R_LIBS_USER!")
@@ -43,6 +44,7 @@ out <- tryCatch(
   install.packages("cellranger")
   install.packages("BiocManager")
   BiocManager::install("Biostrings")
+  install.packages("sys")
 },
   error=install_on_error_or_warning,
   warning=install_on_error_or_warning
