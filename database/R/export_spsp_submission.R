@@ -3,7 +3,7 @@
 # Usage     : Called by the docker container spsp_transferer.
 
 # TODO: automatically update improved sequences?
-# TODO: programatically fill in V-pipe version, sequencing methods, library prep kit to database - here the latter 2 are hardcoded to known truth as of 11.05.2021
+# TODO: programatically fill in V-pipe version, sequencing methods, library prep kit to database - here the latter 2 are hardcoded to known truth as of 24.01.2022
 
 # Load requirements
 source("R/utility.R")
@@ -25,7 +25,7 @@ main <- function(args) {
     config <- read_yaml(file = args$config)
     raw_data_file_names <- upload_raw_data_files(db_output$samples, date, config$raw_data_upload)
     metadata <- get_sample_metadata(db_connection, args, db_output$samples, raw_data_file_names)
-    frameshifts_tbl <- get_frameshift_diagnostics(db_connection, metadata)
+    frameshifts_tbl <- get_frameshift_diagnostics(db_connection, metadata, args)
     write_out_files(metadata, frameshifts_tbl, db_output$summary, db_connection, args)
   } else {
     submission_dir <- paste(args$outdir, "for_submission/viruses", Sys.Date(), sep = "/")
@@ -262,7 +262,7 @@ get_sample_metadata <- function(db_connection, args, samples, raw_data_file_name
     select(sample_name, ethid, coverage, sequencing_center, sequencing_batch, is_random)
 
   query_viollier <- dplyr::tbl(db_connection, "viollier_test") %>%  # join sequence data to sample metadata using ethid
-    select(ethid, sample_number, order_date, zip_code) %>%
+    select(ethid, sample_number, order_date, zip_code, purpose) %>%
     mutate(covv_orig_lab = "Viollier AG", covv_orig_lab_addr = "Hagmattstrasse 14, 4123 Allschwil")
   join_viollier <- left_join(x = query_seqs, y = query_viollier, by = "ethid")
   query_bag_sequence_report <- dplyr::tbl(db_connection, "bag_sequence_report") %>%
@@ -392,16 +392,19 @@ format_metadata_for_spsp <- function(metadata, args) {
       host_sex = "Unknown",
       isolation_source_detailed = "Respiratory specimen",
       sequencing_purpose = case_when(
-        viro_purpose %in% c("outbreak", "travel case", "screening", "surveillance") ~ "Screening",  # SPSP vocabulary distinguishes only between Screening, Clinical signs of infection, Re-infection, Infection after vaccination, Unknown, Other as of 27.05.21
-        T ~ "Other"),
+        purpose %in% c("surveillance", "Surveillance") & lab_name == "Viollier AG Allschwil\r" ~ "Screening",
+        purpose %in% c("diagnostic", "Diagnostic") & lab_name == "Viollier AG Allschwil\r" ~ "Unknown",
+        lab_name == "Labor team w AG, St. Gallen / Goldach\r" ~ "Screening",
+        viro_purpose %in% c("outbreak", "travel case", "screening", "surveillance") ~"Screening", # SPSP vocabulary distinguishes only between Screening, Clinical signs of infection, Re-infection, Infection after vaccination, Unknown, Other as of 27.05.21
+        TRUE ~ "Other"),
       library_preparation_kit = case_when(
-        sequencing_center == "viollier" ~ "Illumina_COVIDSeq",
-        sequencing_center == "gfb" ~ "NEB",
-        sequencing_center == "h2030" ~ "Illumina_COVIDSeq",
+        sequencing_center == "viollier" ~ "Illumina_COVIDSeq (ARTIC V4)",
+        sequencing_center == "gfb" ~ "NEB (ARTIC V3)",
+        sequencing_center == "h2030" ~ "Illumina_COVIDSeq (ARTIC V4)",
         sequencing_center == "fgcz" & as.Date(
           gsub(sequencing_batch, pattern = "_.*", replacement = ""),
           format = "%Y%m%d") < as.Date("2021-04-19") ~ "NEB",
-        sequencing_center == "fgcz" ~ "Nextera XT"),
+        sequencing_center == "fgcz" ~ "Nextera XT (ARTIC V4)"),
       sequencing_platform = "Combination Illumina MiSeq and Illumina NovaSeq 5000/6000",
       assembly_method = "V-pipe",
       raw_dataset_coverage = round(coverage, digits = 0),
@@ -463,7 +466,7 @@ check_mandatory_columns <- function(metadata, args) {
 }
 
 #' Get frameshift diagnostic information.
-get_frameshift_diagnostics <- function(db_connection, metadata) {
+get_frameshift_diagnostics <- function(db_connection, metadata, args) {
   print(log.info(
     msg = "Querying database for frameshift diagnostic information.",
     fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
@@ -472,20 +475,65 @@ get_frameshift_diagnostics <- function(db_connection, metadata) {
     filter(sample_name %in% !! metadata$sample_name) %>%
     select(sample_name, indel_position, indel_diagnosis) %>%
     collect()
+
+  without_frameshifts <- metadata %>% filter(!sample_name %in% !! frameshifts_tbl$sample_name) %>% select(sample_name) %>% collect()
+  missing_table <- NULL
+  
+  print(log.info(
+    msg = "Testing if samples without frameshifts have a report available.",
+    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
+  
+  for (sample in without_frameshifts$sample_name) {
+    missing_table <- c(missing_table, test_frameshift_table(sample, args, db_connection))
+  }
+  if (!is.null(missing_table)) {
+    print(log.error(
+      msg = paste(
+        "No frameshift table in sequence:",
+        missing_table, sep = "\n"),
+      fcn = paste0(args$script_name, "::", "without_frameshifts")))
+    stop(paste("Fatal: Frameshift table does not exist for the following samples\n", missing_table))
+  }
+  
   colnames(frameshifts_tbl)[which(colnames(frameshifts_tbl)=="indel_position")] <- "indel_position_english"
   n_seqs_with_frameshifts <- length(unique(frameshifts_tbl$sample_name))
+
+  print(log.info(
+    msg = "Building the frameshift summary and table.",
+    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
 
   frameshift_summary <- frameshifts_tbl %>% group_by(indel_diagnosis) %>%
     summarize(n_dels = n()) %>%
     arrange(desc(n_dels))
 
-  # Add virus name to frameshift diagnostic table, filter to only seqs with complete metadata
   frameshifts_tbl <- merge(
     x = frameshifts_tbl,
     y = metadata[c("sample_name", "strain_name")],
-    all.x = T, by = "sample_name")
+    all.x = T, all.y = T, by = "sample_name") 
+
+  frameshifts_tbl <- frameshifts_tbl %>%
+    mutate(indel_position_english = tidyr::replace_na(data = indel_position_english, replace = "no frameshifts found in this sequence"))
   return(frameshifts_tbl)
 }
+
+#' Check if the samples without frameshifts have an associated framshift table
+test_frameshift_table <- function(mysample, args, db_connection) {
+  
+  sample_batch <- dplyr::tbl(db_connection, "consensus_sequence") %>%
+    filter(sample_name %in% !! mysample) %>%
+    select(sample_name, sequencing_batch) %>% collect()
+  
+  print(log.info(
+    msg = paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv"),
+    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
+
+  if (!(file.exists(paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv")))) {
+    return(mysample)
+  } else{
+    return(NULL)
+  }
+}
+
 
 #' Write out files for submission to SPSP.
 write_out_files <- function(metadata, frameshifts_tbl, batches_summary, db_connection, args) {
@@ -581,6 +629,7 @@ parser <- argparse::ArgumentParser()
 parser$add_argument("--config", type = "character", help = "Path to spsp-config.yml.", default = "spsp-config.yml")
 parser$add_argument("--samplesetdir", type = "character", help = "Path to V-pipe sample directories.", default = "/mnt/pangolin/sampleset")
 parser$add_argument("--outdir", type = "character", help = "Path to output files for submission.", default = paste("/mnt/pangolin/consensus_data_for_release/spsp_submission", Sys.Date(), sep = "/"))
+parser$add_argument("--workingdir", type = "character", help = "Path to V-pipe working directory.", default = "/mnt/pangolin/working")
 args <- parser$parse_args()
 args[["script_name"]] <- "export_spsp_submission.R"
 

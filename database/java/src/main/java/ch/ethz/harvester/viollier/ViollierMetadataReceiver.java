@@ -139,6 +139,7 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
         }};
         Set<String> toleratedColumns = new HashSet<>() {{
             add("Author list for GISAID");
+            add("60997 wuha20");
         }};
 
         List<Sample> allSamples = new ArrayList<>();
@@ -156,11 +157,12 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
             Set<String> unexpectedColumns = new HashSet<>(headerNames);
             unexpectedColumns.removeAll(requiredColumns);
             unexpectedColumns.removeAll(toleratedColumns);
-            if (!missingColumns.isEmpty() || !unexpectedColumns.isEmpty()) {
-                throw new RuntimeException("We miss columns or found unexpected columns: "
+            if (!missingColumns.isEmpty()) {
+                throw new RuntimeException("We miss columns: "
                         + Arrays.toString(missingColumns.toArray()) + " --- "
                         + Arrays.toString(unexpectedColumns.toArray()));
             }
+            // We currently accept additional columns because we expect receiving additional data from Viollier.
 
             // Create sample objects (including normalizations and sample-wise checks)
             List<Sample> samples = new ArrayList<>();
@@ -174,6 +176,20 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
                 Integer ct = Utils.nullableIntegerValue(csvRecord.get("CT Wert"));
                 String viollierPlateName = csvRecord.get("PlateID");
                 String wellPosition = csvRecord.get("DeepWellLocation");
+                String purpose = null;
+                try {
+                    String purposeEncoded = csvRecord.get("60997 wuha20");
+                    if (purposeEncoded != null) {
+                        if (purposeEncoded.equals("res")) {
+                            purpose = "diagnostic";
+                        } else if (purposeEncoded.isBlank()) {
+                            purpose = "surveillance";
+                        } else {
+                            throw new RuntimeException("Unexpected value in the column \"60997 wuha20\": \"" + purposeEncoded + "\"");
+                        }
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
 
                 // The important metadata are only allowed to be missing if the whole row is actually empty.
                 if (sampleNumber == null || sampleNumber == 0 || canton == null || dateString == null) {
@@ -203,7 +219,8 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
                         .setOrderDate(orderDate)
                         .setCt(ct)
                         .setViollierPlateName(viollierPlateName)
-                        .setWellPosition(wellPosition);
+                        .setWellPosition(wellPosition)
+                        .setPurpose(purpose);
                 normalizeSample(sample);
                 boolean sampleOk = checkSample(sample);
                 if (!sampleOk) {
@@ -414,9 +431,9 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
 
         // Add to viollier_test (if the sample is not already in the database)
         String insertVtSql = """
-            insert into viollier_test (sample_number, ethid, order_date, zip_code, city, canton, is_positive)
-            values (?, ?, ?, ?, ?, ?, true)
-            on conflict do nothing;       
+            insert into viollier_test (sample_number, ethid, order_date, zip_code, city, canton, is_positive, purpose)
+            values (?, ?, ?, ?, ?, ?, true, ?)
+            on conflict do nothing;
         """;
         try (PreparedStatement statement = conn.prepareStatement(insertVtSql)) {
             for (Sample sample : samples) {
@@ -426,6 +443,7 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
                 statement.setString(4, sample.getZipCode());
                 statement.setString(5, sample.getCity());
                 statement.setString(6, sample.getCanton());
+                statement.setString(7, sample.getPurpose());
                 statement.addBatch();
             }
             statement.executeBatch();

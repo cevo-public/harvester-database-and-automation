@@ -13,7 +13,7 @@ RUN apt-get install -y cifs-utils
 
 # Prepare python
 RUN apt-get install -y python3 python3-pip
-COPY database/python/requirements.txt python/
+COPY requirements.txt python/
 RUN pip3 install -r python/requirements.txt
 
 # Clone nextstrain/ncov repository
