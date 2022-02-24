@@ -50,9 +50,9 @@ from
         group by sample_name
       ) csma on cs.sample_name = csma.sample_name
     where
-      not m.old_sample
+      cs.sequencing_plate is not null
   ) union all
-  ( -- For the old samples
+  ( -- For the old samples: We only use ETHID to join if the sequencing_plate is not known
     select
       auftraggeber_nummer,
       alt_seq_id,
@@ -115,7 +115,7 @@ from
               group by sample_name
             ) csma on cs.sample_name = csma.sample_name
           where
-            m.old_sample
+            cs.sequencing_plate is null
     ) x
     where priority_idx = 1
   )) x
