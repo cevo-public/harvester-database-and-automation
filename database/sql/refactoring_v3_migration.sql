@@ -87,7 +87,7 @@ from viollier_plate vp
 where left_viollier_date >= '2021-08-01';
 
 
--- Before 7 June 2021, we had the old procedure. Samples resulted that it shall be marked as "old".
+-- The samples before 1 August 2021 will be marked as "old" because the new procedure has not been fully in place.
 insert into z_test_plate_mapping (
   test_id, extraction_plate, extraction_plate_well, extraction_e_gene_ct, extraction_rdrp_gene_ct,
   sample_type, old_sample
@@ -103,15 +103,17 @@ select
 from
   viollier_test__viollier_plate vtvp
   join viollier_plate vp on vtvp.viollier_plate_name = vp.viollier_plate_name
-where vp.left_viollier_date <= '2021-06-07';
+where vp.left_viollier_date < '2021-08-01';
 
 
 insert into z_test_plate_mapping (
-  test_id, extraction_plate, extraction_plate_well, extraction_e_gene_ct, extraction_rdrp_gene_ct,
-  sample_type, old_sample
+  test_id, extraction_plate, extraction_plate_well, sequencing_plate, sequencing_plate_well,
+  extraction_e_gene_ct, extraction_rdrp_gene_ct, sample_type, old_sample
 )
 select
   'viollier/' || vtvp.sample_number,
+  vtvp.viollier_plate_name,
+  vtvp.well_position,
   vtvp.viollier_plate_name,
   vtvp.well_position,
   vtvp.e_gene_ct,
@@ -121,4 +123,4 @@ select
 from
   viollier_test__viollier_plate vtvp
   join viollier_plate vp on vtvp.viollier_plate_name = vp.viollier_plate_name
-where vp.left_viollier_date > '2021-06-07';
+where vp.left_viollier_date >= '2021-08-01';
