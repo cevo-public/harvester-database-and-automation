@@ -10,6 +10,7 @@ import_fgcz_failed_seqs <- function(
   for (file_i in files_to_import) {
     sequencing_batch <- strsplit(x = file_i, split = "\\.")[[1]][2]
     sample_names <- read.delim(file = paste(sampleset_dir, file_i, sep = "/"), header = F)
+    sample_names[, 1] <- as.character(sample_names[, 1])
 
     failed_seq_data <- data.frame(
       sample_name = sample_names$V1,
