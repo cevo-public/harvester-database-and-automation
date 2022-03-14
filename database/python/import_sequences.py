@@ -84,16 +84,34 @@ def import_sequences(
 
     def read_single(sample_name, file_name):
         path = os.path.join(
-            data_dir,
-            sample_name,
-            batch_to_import,
-            "references",
-            file_name)
+            data_dir, sample_name, batch_to_import, "references", file_name
+        )
         seqs = list(SeqIO.parse(path, "fasta"))
         assert len(seqs) == 1
         return str(seqs[0].seq)
 
     for sample_name in found_sample_names:
+
+        ethid = sample_name.split("_")[0]
+        try:
+            ethid = int(ethid)
+            cursor.execute(
+                """
+                SELECT sequencing_plate, sequencing_plate_well
+                FROM z_test_plate_mapping
+                JOIN z_test_metadata
+                ON z_test_plate_mapping.test_id = z_test_metadata.test_id
+                WHERE ethid=%s;""",
+                (ethid,),
+            )
+            rows = cursor.fetchall()
+            if not rows:
+                plate, well = None, None
+            else:
+                plate, well = rows[0]
+        except ValueError:
+            plate, well = None, None
+
         i += 1
         if batch is None:
             # take sequences from 1st available batch -- you may want to specify a
@@ -108,9 +126,10 @@ def import_sequences(
         try:
             cursor.execute(
                 f"INSERT INTO {DEST_TABLE}"
-                " (sample_name, seq_aligned, seq_unaligned, sequencing_batch)"
-                " VALUES(%s, %s, %s, %s)",
-                (sample_name, seq_aligned, seq_unaligned, batch_to_import),
+                " (sample_name, seq_aligned, seq_unaligned, sequencing_batch, "
+                "  sequencing_plate, sequencing_plate_well)"
+                " VALUES(%s, %s, %s, %s, %s, %s)",
+                (sample_name, seq_aligned, seq_unaligned, batch_to_import, plate, well),
             )
             conn.commit()
         except psycopg2.errors.UniqueViolation:
