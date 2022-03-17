@@ -45,9 +45,10 @@ select
     when covv_orig_lab = 'Institute for Molecular Health Science, ETH Zurich' then 'mhs_eth'
     when covv_orig_lab = 'Department of Dermatology, University of Zürich, University of Zürich Hospital, Switzerland '
       then 'dermatology_uzh'
-    when 'labor team w AG' then 'team_w'
+    when covv_orig_lab = 'labor team w AG' then 'team_w'
+    when covv_orig_lab = 'Institut Central des Hôpitaux Valaisans ICHV/ZIWS Service des Maladies Infectieuses' then 'hospital_valais'
   end) || '/' ||
-  coalesce(sample_number, 'unknown'),
+  coalesce(sample_number::text, 'unknown-' || row_number() over ()),
   si.ethid,
   nvt.order_date,
   nvt.zip_code,
@@ -124,3 +125,32 @@ from
   viollier_test__viollier_plate vtvp
   join viollier_plate vp on vtvp.viollier_plate_name = vp.viollier_plate_name
 where vp.left_viollier_date >= '2021-08-01';
+
+
+-- Migrate consensus_sequence
+insert into z_consensus_sequence (
+  sample_name, sequencing_plate, sequencing_plate_well, insert_date, update_date, sequencing_center,
+  sequencing_batch, seq_aligned, seq_unaligned, ethid
+)
+select
+  sample_name, null, null, null, null, sequencing_center,
+  sequencing_batch, seq, seq, ethid
+from consensus_sequence;
+
+
+insert into z_consensus_sequence_meta (
+  sample_name, coverage_mean, r1_basequal, r2_basequal, rejreads, alnreads, insertsize,
+  consensus_n, qc_result, diagnostic_divergence, diagnostic_excess_divergence, diagnostic_number_n,
+  diagnostic_number_gaps, diagnostic_clusters, diagnostic_gaps, diagnostic_all_snps, diagnostic_flagging_reason
+)
+select
+  sample_name, coverage, r1_basequal, r2_basequal, rejreads, alnreads, insertsize,
+  consensus_n, fail_reason, divergence, excess_divergence, number_n,
+  number_gaps, clusters, gaps, all_snps, flagging_reason
+from consensus_sequence;
+
+
+insert into z_consensus_sequence_notes (sample_name, release_decision, comment)
+select sample_name, null, comment
+from consensus_sequence
+where comment is not null;
