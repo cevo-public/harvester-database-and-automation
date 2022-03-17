@@ -17,7 +17,7 @@ def import_sequences(
     update=False,
     batch=None,
 ):
-    DEST_TABLE = "z_consensus_sequence"
+    DEST_TABLE = "consensus_sequence"
 
     # Connect to database
     db_connection = (
@@ -98,9 +98,9 @@ def import_sequences(
             cursor.execute(
                 """
                 SELECT sequencing_plate, sequencing_plate_well
-                FROM z_test_plate_mapping
-                JOIN z_test_metadata
-                ON z_test_plate_mapping.test_id = z_test_metadata.test_id
+                FROM test_plate_mapping
+                JOIN test_metadata
+                ON test_plate_mapping.test_id = test_metadata.test_id
                 WHERE ethid=%s;""",
                 (ethid,),
             )
@@ -145,9 +145,9 @@ def import_sequences(
                 # Drop rows in nextclade tables so nextclade will be re-run on
                 # the updated sequences
                 for table in (
-                    "z_consensus_sequence_nextclade_mutation_aa",
-                    "z_consensus_sequence_mutation_nucleotide",
-                    "z_consensus_sequence_sequence_meta",
+                    "consensus_sequence_mutation_nucleotide",
+                    "consensus_sequence_mutation_aa",
+                    "consensus_sequence_sequence_meta",
                 ):
                     cursor.execute(
                         f"DELETE FROM {table} WHERE sample_name = %s",
