@@ -83,8 +83,14 @@ spawn_ssh_process <- function(config, date, samples)
     private_key_euler <- config$private_key_euler
     passphrase <- config$passphrase
 
+    t <- tempdir();
+    tmp_key <- file.path(t, private_key_euler)
+    file.copy(private_key_euler, tmp_key)
+    Sys.chmod(tmp_key, mode="0600")
+    Sys.chmod(t, mode="0700")
+
     args = c(paste0(user, "@", server),
-                "-i", private_key_euler,
+                "-i", tmp_key,
                 "-o", "StrictHostKeyChecking=accept-new",
                 "spsp",
                 uploads_folder,
