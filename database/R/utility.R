@@ -8,7 +8,7 @@
 #' @param db_connection
 #' @return Data frame with columns sample_name and priority with one row per sequence in context set.
 get_priority <- function(
-  db_connection, focal_samples, context_samples,
+  db_connection, focal_samples, context_samples, 
   tmpdir = "tmp/priority",
   overwrite = F,
   clean_tmpdir = T,
@@ -26,21 +26,21 @@ get_priority <- function(
     stop(paste(tmpdir, "already exists and overwrite is false."))
   }
   system(command = paste("mkdir -p", tmpdir))
-
+  
   # Write out alignment of focal and context sequences
   export_seqs_as_fasta(
-    db_connection = db_connection,
+    db_connection = db_connection, 
     sample_names = focal_samples,
     seq_outfile = paste(tmpdir, "focal.fasta", sep = "/"),
     table = table, sample_name_col = sample_name_col, seq_col = seq_col
   )
   export_seqs_as_fasta(
-    db_connection = db_connection,
+    db_connection = db_connection, 
     sample_names = context_samples,
     seq_outfile = paste(tmpdir, "context.fasta", sep = "/"),
     table = table, sample_name_col = sample_name_col, seq_col = seq_col
   )
-
+  
   # Generate nextstrain-style metadata for the sequences
   export_metadata_as_nextstrain_format(
     db_connection = db_connection,
@@ -48,19 +48,19 @@ get_priority <- function(
     sample_names = c(focal_samples, context_samples),
     table = table, sample_name_col = sample_name_col, date_col = date_col
   )
-
+  
   # Run priority script
   priorities_command <- paste0(python, " ", ncovdir, "/scripts/priorities.py", " --alignment ", tmpdir, "/context.fasta", " --reference ", ncovdir, "/defaults/reference_seq.gb", " --metadata ", tmpdir, "/metadata.txt", " --focal-alignment ", tmpdir, "/focal.fasta", " --output ", tmpdir, "/priorities.txt")
-  cat("Running nextstrain priorities script with command:",
+  cat("Running nextstrain priorities script with command:", 
       priorities_command, sep = "\n")
   system(command = priorities_command)
-
+  
   # Return priority results
   priorities <- read.table(
     file = paste0(tmpdir, "/priorities.txt"), sep = "\t") %>%
     rename(strain = V1, "priority" = V2) %>%
     arrange(priority)
-
+  
   # Clean up
   if (clean_tmpdir) {
     system(command = paste("rm", tmpdir))
@@ -71,15 +71,15 @@ get_priority <- function(
 #' Find genetically similar sequences from context set to focal set of sequences.
 #' By running a modified version of the script that fetches sequenecs directly from the database.
 run_nextstrain_priority <- function(
-  focal_strains, nonfocal_strains, prefix, outdir,
+  focal_strains, nonfocal_strains, prefix, outdir, 
   python_path, priorities_script, reference, verbose = F,
-  focal_strain_table, context_strain_table,
-  focal_sample_name_col, context_sample_name_col,
+  focal_strain_table, context_strain_table, 
+  focal_sample_name_col, context_sample_name_col, 
   focal_seq_col, context_seq_col, config_filepath = "database/config.yml"
 ) {
   n_focal_strains <- length(focal_strains)
   n_nonfocal_strains <- length(nonfocal_strains)
-
+  
   if (n_focal_strains == 0) {
     warning(paste("No focal sequences found for", prefix))
     return(NA)
@@ -87,20 +87,20 @@ run_nextstrain_priority <- function(
     warning(paste("No context sequences found for", prefix))
     return(NA)
   } else if (n_nonfocal_strains > 20000) {
-    stop(paste("Too many sequences for priorities.py:",
+    stop(paste("Too many sequences for priorities.py:", 
                n_nonfocal_strains, "non-focal sequences."))
   }
-  print(paste("Running priorities.py for", prefix, "with",
-              length(focal_strains), "focal sequences and",
+  print(paste("Running priorities.py for", prefix, "with", 
+              length(focal_strains), "focal sequences and", 
               length(nonfocal_strains), "non-focal sequences."))
-
+  
   outfile_focal_strains <- paste0(outdir, "/", prefix, "_focal_strains.txt")
   outfile_context_strains <- paste0(outdir, "/", prefix, "_nonfocal_strains.txt")
   write.table(
     x = c("strain", focal_strains), row.names = F, quote = F, col.names = F,
     file = outfile_focal_strains)
   write.table(
-    x = c("strain", nonfocal_strains), row.names = F, quote = F,
+    x = c("strain", nonfocal_strains), row.names = F, quote = F, 
     col.names = F, file = outfile_context_strains)
 
   outfile_priorities <- paste0(outdir, "/", prefix, "_priorities.txt")
@@ -122,60 +122,60 @@ run_nextstrain_priority <- function(
     print(priorities_command)
   }
   system(command = priorities_command)
-
+  
   priorities <- read.delim(
     file = paste0(outdir, "/", prefix, "_priorities.txt"),
     header = F,
     col.names = c("strain", "priority", "focal_strain"),
     stringsAsFactors = F) %>%
     arrange(desc(priority))
-
+  
   system(command = paste("rm", outfile_focal_strains))
   system(command = paste("rm", outfile_context_strains))
   system(command = paste("rm", outfile_priorities))
-
+  
   return(priorities)
 }
 
 #' Export minimal metadata in nextstrain format.
-#' @return minimal metadata in nextstrain format. Enables e.g. run of nextstrain
+#' @return minimal metadata in nextstrain format. Enables e.g. run of nextstrain 
 #' priorities.py and diagnostic.py scripts.
 export_metadata_as_nextstrain_format <- function(
   db_connection, sample_names, metadata_outfile,
-  table, sample_name_col, date_col,
+  table, sample_name_col, date_col, 
   virus = "ncov", region = "dummy_region", date_submitted_delay = 14
 ) {
   metadata_tbl <- dplyr::tbl(db_connection, table) %>%
     filter(!!sym(sample_name_col) %in% sample_names) %>%
-    select(!!sym(sample_name_col), !!sym(date_col)) %>%
+    select(!!sym(sample_name_col), !!sym(date_col)) %>% 
     collect()
   metadata_tbl <- metadata_tbl %>%
-    mutate(virus = "ncov",
-           region = "dummy_region",
+    mutate(virus = "ncov", 
+           region = "dummy_region", 
            date_submitted = as.Date(!!sym(date_col)) + date_submitted_delay,
            comment = "region and date_submitted have dummy values.") %>%
     rename(name = !!sym(sample_name_col), date = !!sym(date_col))
   write.table(
-    x = metadata_tbl,
-    file = metadata_outfile,
+    x = metadata_tbl, 
+    file = metadata_outfile, 
     sep = "\t", row.names = F)
 }
 
 #' Get the raw read distribution at a position in a sequence.
 get_read_distribution <- function(
-  db_connection, sample_name, pos_list,
+  db_connection, sample_name, pos_list, 
   READ_TOPDIR = "/Volumes/shared/covid19-pangolin/backup/working/samples/"
 ) {
   # Get filepath for basecnt.tsv.gz
   readfile_info <- dplyr::tbl(db_connection, "consensus_sequence") %>%
     filter(sample_name == !! sample_name) %>%
-    select(ethid, sample_name, sequencing_batch, seq) %>%
+    select(ethid, sample_name, sequencing_batch, seq_aligned) %>%
     collect() %>%
     mutate(
       readfile = paste(
         READ_TOPDIR, sample_name, sequencing_batch, "alignments",
         "basecnt.tsv.gz", sep = "/"))
-
+  
   # See what the raw reads are at this position
   read_file <- unlist(readfile_info$readfile)
   print(read_file)
@@ -184,12 +184,12 @@ get_read_distribution <- function(
   close(read_con)
   colnames(read_data) <- c("ref", "pos", "A", "C", "G", "T", "-")
   pos_read_data <- read_data %>% filter(pos %in% c(pos_list))
-
+  
   reference <- dplyr::tbl(db_connection, "consensus_sequence") %>%
     filter(sample_name == "REFERENCE_GENOME") %>%
     select(seq) %>%
     collect
-
+  
   # See what the base calls are
   pos_seq_chars <- toupper(unlist(strsplit(
     x = unlist(readfile_info$seq), split = "")))[pos_list + 1]
@@ -200,9 +200,9 @@ get_read_distribution <- function(
     pos = pos_list,
     consensus = pos_seq_chars,
     reference = pos_ref_chars)
-  pos_data <- merge(x = pos_read_data, y = pos_seq_data, all = T) %>%
+  pos_data <- merge(x = pos_read_data, y = pos_seq_data, all = T) %>% 
     mutate(pos = as.numeric(as.character(pos)) + 1)
-
+  
   pos_freq_matrix <- t(pos_data[c("A", "C", "T", "G")])
   colnames(pos_freq_matrix) <- pos_data$pos
   return(list(pos_data = pos_data, pos_freq_matrix = pos_freq_matrix))
@@ -265,31 +265,31 @@ get_mean_n_nucleotide_differences <- function(seqs, pairwise = F) {
 #' @param y Another dataframe.
 #' @param by Key column name to join by.
 #' @return A dataframe with duplicate columns in x and y coalesced.
-coalesce_join <- function(x, y, by = NULL, suffix = c(".x", ".y"),
+coalesce_join <- function(x, y, by = NULL, suffix = c(".x", ".y"), 
                           join = dplyr::left_join, ...) {
   joined <- join(x, y, by = by, suffix = suffix, ...)
   cols <- union(names(x), names(y))  # names of desired output
-
+  
   to_coalesce <- names(joined)[!names(joined) %in% cols]
   suffix_used <- suffix[ifelse(endsWith(to_coalesce, suffix[1]), 1, 2)]
-
+  
   # remove suffixes and deduplicate
   to_coalesce <- unique(substr(
-    to_coalesce,
-    1,
+    to_coalesce, 
+    1, 
     nchar(to_coalesce) - nchar(suffix_used)))
-
+  
   # cast to factor for dplyr::coalesce
   joined[c(paste0(to_coalesce, suffix[1]), paste0(to_coalesce, suffix[2]))] <- apply(
     X = joined[c(paste0(to_coalesce, suffix[1]), paste0(to_coalesce, suffix[2]))],
-    MARGIN = 2,
+    MARGIN = 2, 
     FUN = as.factor)
-
+  
   names(to_coalesce) <- to_coalesce
   coalesced <- purrr::map_dfc(to_coalesce, ~dplyr::coalesce(
     joined[[paste0(.x, suffix[1])]],
     joined[[paste0(.x, suffix[2])]]))
-
+  
   return(dplyr::bind_cols(joined, coalesced)[cols])
 }
 
@@ -306,14 +306,14 @@ coalesce_join <- function(x, y, by = NULL, suffix = c(".x", ".y"),
 #' @param mask_from_start (Optional) Number of sites to mask from start of alignment.
 #' @param mask_from_end (Optional) Number of sites to mask from end of alignment.
 #' @param gzip Boolean indicating whether to compress sequence file using gzip or not.
-export_seqs_as_fasta <- function(db_connection, sample_names,
-                                 seq_outfile = NULL, seq_outdir = NULL,
+export_seqs_as_fasta <- function(db_connection, sample_names, 
+                                 seq_outfile = NULL, seq_outdir = NULL, 
                                  overwrite = F, append = F, warn_append = T,
                                  header_mapping = NULL, fail_incomplete = T,
                                  warn_outfile = NULL,
-                                 table = "z_consensus_sequence",
+                                 table = "consensus_sequence",
                                  sample_name_col = "sample_name",
-                                 seq_col = "seq_unaligned",
+                                 seq_col = "seq_aligned",
                                  mask_from_start = 0,
                                  mask_from_end = 0,
                                  gzip = F
@@ -334,16 +334,16 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
   } else if (file.exists(seq_outfile)) {
     stop(paste(seq_outfile, "already exists and overwrite, append are false."))
   }
-
+  
   if (length(sample_names) == 0 || is.na(sample_names)) {
     stop("No sample_names specified for export to fasta.")
   }
-
+  
   seq_query <- dplyr::tbl(db_connection, table) %>%
     filter(!!sym(sample_name_col) %in% sample_names) %>%
     select(!!sym(sample_name_col), !!sym(seq_col))
   seq_tbl <- seq_query %>% collect()
-
+  
   if (mask_from_start > 0 | mask_from_end > 0) {
     seq_tbl[[seq_col]] <- unlist(lapply(
       X = seq_tbl[[seq_col]],
@@ -351,7 +351,7 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
       mask_from_start = mask_from_start, mask_from_end = mask_from_end
     ))
   }
-
+  
   if (!all(sample_names %in% seq_tbl[[sample_name_col]])) {
     missing_samples <- sample_names[!(sample_names %in% seq_tbl[[sample_name_col]])]
     if (fail_incomplete) {
@@ -373,7 +373,7 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
     seq_headers <- header_mapping[seq_tbl[[sample_name_col]]]
     seq_tbl[[sample_name_col]] <- seq_headers
   }
-
+  
   seq_tbl <- seq_tbl %>% mutate("header" = paste0(">", !!sym(sample_name_col)))
   if (!is.null(seq_outdir)) {
     for (i in 1:nrow(seq_tbl)) {
@@ -381,20 +381,25 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
       fp <- paste0(seq_outdir, "/", sample_name, ".fasta")
       seq_outfile_con <- file(fp, open = "a")
       writeLines(
-        unlist(seq_tbl[i, c("header", seq_col)]),
-        con = seq_outfile_con,
+        unlist(seq_tbl[i, c("header", seq_col)]), 
+        con = seq_outfile_con, 
         sep = "\n")
       close(seq_outfile_con)
     }
     if (gzip) {
       system(command = paste0("gzip ", seq_outdir, "/*.fasta"))
+      #get rid of the ._ files that may be generated by MacOS
+      hidden_files <- list.files(seq_outdir,all.files=TRUE)
+      if (length(grep("\\._", hidden_files)) > 0) {
+        system(command = paste0("rm ", seq_outdir, "/._*.fasta.gz"))
+      }
     }
   } else {
     seq_outfile_con <- file(seq_outfile, open = "a")
     for (i in 1:nrow(seq_tbl)) {
       writeLines(
-        unlist(seq_tbl[i, c("header", seq_col)]),
-        con = seq_outfile_con,
+        unlist(seq_tbl[i, c("header", seq_col)]), 
+        con = seq_outfile_con, 
         sep = "\n")
     }
     close(seq_outfile_con)
@@ -448,15 +453,15 @@ summarize_update <- function(
 get_key_col_sql <- function(key_col) {
   if (length(key_col) == 1) {
     key_col_sql <- paste(
-      "WHERE", paste("t", key_col, sep = "."), "=",
+      "WHERE", paste("t", key_col, sep = "."), "=", 
       paste("s", key_col, sep = "."))
   } else {
     key_col_sql <- paste(
-      "WHERE", paste("t", key_col[1], sep = "."), "=",
+      "WHERE", paste("t", key_col[1], sep = "."), "=", 
       paste("s", key_col[1], sep = "."))
     for (i in 2:length(key_col)) {
       key_col_sql_phrase <- paste(
-        "AND", paste("t", key_col[i], sep = "."), "=",
+        "AND", paste("t", key_col[i], sep = "."), "=", 
         paste("s", key_col[i], sep = "."))
       key_col_sql <- paste(key_col_sql, key_col_sql_phrase)
     }
@@ -474,14 +479,14 @@ get_key_col_sql <- function(key_col) {
 #' @param table_spec Data frame with table column type specifications.
 #' @param close_con If false, leaves connection to database 'con' open so that this function can be called in a loop.
 update_table <- function(
-  table_name, new_table, con, append_new_rows = T, cols_to_update, key_col,
+  table_name, new_table, con, append_new_rows = T, cols_to_update, key_col, 
   table_spec, close_con = T, run_summarize_update = T, verbose = F
 ) {
   if (run_summarize_update) {
     summarize_update(
       table_name, new_table, con, append_new_rows, cols_to_update, key_col)
   }
-
+  
   # create staging table
   staging_table_name <- paste0(table_name, "_staging")
   DBI::dbBegin(con)
@@ -492,7 +497,7 @@ update_table <- function(
   names(field_types) <- table_spec$name
   field_types <- field_types[names(field_types) %in% colnames(new_table)]  # only provide field types for columns to be imported to staging table
   if (verbose) {
-    print(paste("Writing staging table", staging_table_name))
+    print(paste("Writing staging table", staging_table_name, "to", con))
     print(paste("Field types are:", field_types))
   }
   DBI::dbWriteTable(
@@ -548,9 +553,9 @@ get_ethid_from_gisaid_strain <- function(gisaid_strain) {
 }
 
 #' Parse ethid from sample names given by the sequencing center (how sequencing results are labeled).
-#' The ETHID is assumed to be the first 6 or 8 digits in the sample name,
-#' so long as this is followed by an underscore or end of sample name and is
-#' present in either the ethid (6-digits) or sample_number (8-digits) column in
+#' The ETHID is assumed to be the first 6 or 8 digits in the sample name, 
+#' so long as this is followed by an underscore or end of sample name and is 
+#' present in either the ethid (6-digits) or sample_number (8-digits) column in 
 #' the viollier_test table.
 #' @param sample_name The name given to the sample by the sequencing center.
 #' @param db_connection
@@ -565,8 +570,8 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
   if (is_ethid_format) {  # Check if ETHID is in the viollier_test table
     ethid <- unlist(strsplit(sample_name, split = "_"))[1]
     in_vt_once <- nrow(
-      dplyr::tbl(db_connection, "viollier_test") %>%
-        filter(ethid == !! ethid) %>%
+      dplyr::tbl(db_connection, "test_metadata") %>% 
+        filter(ethid == !! ethid) %>% 
         collect()) == 1
     if (in_vt_once) {
       return(ethid)
@@ -574,11 +579,12 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
       warning(paste(ethid, "found 0 or > 1 times in the Viollier test table column 'ethid'. Invalid ETHID."))
       return(NA)
     }
+  ###FIXME: Uncertain about this. Need to still be fixed
   } else if (is_sample_number_format) {  # Check if sample number is in the viollier_test table
     ethid <- unlist(strsplit(sample_name, split = "_"))[1]
     in_vt_once <- nrow(
-      dplyr::tbl(db_connection, "viollier_test") %>%
-        filter(sample_number == !! ethid) %>%
+      dplyr::tbl(db_connection, "viollier_test") %>% 
+        filter(sample_number == !! ethid) %>% 
         collect()) == 1
     if (in_vt_once) {
       return(ethid)
@@ -608,8 +614,8 @@ enforce_sql_spec <- function(
       print(paste("Checking for special column type for column", colname))
     }
     col_spec_names <- c(
-      colname,
-      paste(unique(table_name, type_prefix), colname, sep = "_"),
+      colname, 
+      paste(unique(table_name, type_prefix), colname, sep = "_"), 
       paste(unique(table_name, type_prefix), colname, "type", sep = "_"))
     col_spec_name <- col_spec_names[which(col_spec_names %in% names(col_spec))]
     if (length(col_spec_name) > 0) {
@@ -804,7 +810,7 @@ open_database_connection <- function (
   return(db_connection)
 }
 
-#' Check if iso code is in country table. Unknown codes get overwritten
+#' Check if iso code is in country table. Unknown codes get overwritten 
 #' @param iso_country ISO country code.
 #' @param db_connection
 #' @return iso_country if code is in country table, 'XXX' otherwise
@@ -836,14 +842,14 @@ iso_code_to_country_name <- function(iso_code) {
 country_name_to_iso_code <- function(country, language = "english") {
   if (language == "english") {
     codes <- countrycode::countrycode(
-      sourcevar = country,
-      origin = "country.name",
+      sourcevar = country, 
+      origin = "country.name", 
       destination = "iso3c",
       custom_match = c("Kosovo" = "KOS"))
   } else if (language == "german") {
     codes <- countrycode::countrycode(
-      sourcevar = country,
-      origin = "country.name.de",
+      sourcevar = country, 
+      origin = "country.name.de", 
       destination = "iso3c",
       custom_match = c("Kosovo" = "KOS"))
   } else {
@@ -853,13 +859,13 @@ country_name_to_iso_code <- function(country, language = "english") {
 }
 
 #' Given a list of sequencing batches, check the list of sequences in the database
-#' against the list of samples in V-pipe's sampleset/samples.<batch>.tsv file.
+#' against the list of samples in V-pipe's sampleset/samples.<batch>.tsv file. 
 #' @param batches List of batch names, e.g. c('20210326_H5YL5DRXY')
 #' @param samples_in_database List of sample names from database to check against.
 #' @param sampleset_dir Directory with V-pipe's sampleset/samples.<batch>.tsv files.
 #' @return Logical vector indicating whether each of batches is complete.
 check_all_seqs_imported <- function(
-  batches,
+  batches, 
   samples_in_database,
   sampleset_dir = "/Volumes/shared/covid19-pangolin/backup/sampleset",
   verbose = T) {
