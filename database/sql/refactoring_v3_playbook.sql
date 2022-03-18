@@ -1,3 +1,7 @@
+-----
+-- Create new database schema and migrate data
+-----
+
 -- (1)
 -- Delete old tables.
 
@@ -34,6 +38,7 @@ alter table non_viollier_test rename to backup_220317_non_viollier_test;
 alter table consensus_sequence rename to backup_220317_consensus_sequence;
 alter table consensus_sequence_meta rename to backup_220317_consensus_sequence_meta;
 alter table consensus_sequence_mutation_aa rename to backup_220317_consensus_sequence_mutation_aa;
+alter table consensus_sequence_nextclade_mutation_aa rename to backup_220317_consensus_sequence_nextclade_mutation_aa;
 alter table consensus_sequence_mutation_nucleotide rename to backup_220317_consensus_sequence_mutation_nucleotide;
 alter table consensus_sequence_nextclade_data rename to backup_220317_consensus_sequence_nextclade_data;
 alter table consensus_sequence_notes rename to backup_220317_consensus_sequence_notes;

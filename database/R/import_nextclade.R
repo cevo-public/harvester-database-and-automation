@@ -23,7 +23,7 @@ import_nextclade_mutations_aa <- function (db_connection, nextclade_file) {
     )
 
   DBI::dbBegin(db_connection)
-  DBI::dbAppendTable(db_connection, name = "z_consensus_sequence_mutation_aa", nextclade_mutations_aa)
+  DBI::dbAppendTable(db_connection, name = "consensus_sequence_mutation_aa", nextclade_mutations_aa)
   DBI::dbCommit(db_connection)
 
   return(nextclade_mutations_aa)
@@ -102,9 +102,9 @@ import_nextclade_data_without_mutations <- function (db_connection, nextclade_fi
     )
 
   table_spec <- parse_table_specification(
-    table_name = "z_consensus_sequence_meta", db_connection = db_connection)
+    table_name = "consensus_sequence_meta", db_connection = db_connection)
   update_table(
-    "z_consensus_sequence_meta",
+    "consensus_sequence_meta",
     nextclade_data,
     db_connection,
     append_new_rows = FALSE,
@@ -136,7 +136,7 @@ import_nextclade_data_without_mutations <- function (db_connection, nextclade_fi
       "nextclade_qc_snp_clusters_score",
       "nextclade_qc_snp_clusters_status",
       "nextclade_qc_snp_clusters_total",
-      "nextclade_errors",
+      "nextclade_errors"
     ),
     key_col = "sample_name",
     table_spec = table_spec,
@@ -197,7 +197,7 @@ import_gisaid_nextclade_mutations_aa <- function (db_connection, nextclade_file,
 get_sample_names_without_nextclade <- function (db_connection) {
   sql <- "
     select csm.sample_name
-    from z_consensus_sequence_meta csm
+    from consensus_sequence_meta csm
     where csm.nextclade_qc_overall_score is null
     order by random()
     limit 5000;
