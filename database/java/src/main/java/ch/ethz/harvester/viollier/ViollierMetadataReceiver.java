@@ -139,6 +139,7 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
         }};
         Set<String> toleratedColumns = new HashSet<>() {{
             add("Author list for GISAID");
+            add("60997 wuha20");
         }};
 
         List<Sample> allSamples = new ArrayList<>();
@@ -156,11 +157,12 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
             Set<String> unexpectedColumns = new HashSet<>(headerNames);
             unexpectedColumns.removeAll(requiredColumns);
             unexpectedColumns.removeAll(toleratedColumns);
-            if (!missingColumns.isEmpty() || !unexpectedColumns.isEmpty()) {
-                throw new RuntimeException("We miss columns or found unexpected columns: "
+            if (!missingColumns.isEmpty()) {
+                throw new RuntimeException("We miss columns: "
                         + Arrays.toString(missingColumns.toArray()) + " --- "
                         + Arrays.toString(unexpectedColumns.toArray()));
             }
+            // We currently accept additional columns because we expect receiving additional data from Viollier.
 
             // Create sample objects (including normalizations and sample-wise checks)
             List<Sample> samples = new ArrayList<>();
@@ -174,6 +176,20 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
                 Integer ct = Utils.nullableIntegerValue(csvRecord.get("CT Wert"));
                 String viollierPlateName = csvRecord.get("PlateID");
                 String wellPosition = csvRecord.get("DeepWellLocation");
+                String purpose = null;
+                try {
+                    String purposeEncoded = csvRecord.get("60997 wuha20");
+                    if (purposeEncoded != null) {
+                        if (purposeEncoded.equals("res")) {
+                            purpose = "diagnostic";
+                        } else if (purposeEncoded.isBlank()) {
+                            purpose = "surveillance";
+                        } else {
+                            throw new RuntimeException("Unexpected value in the column \"60997 wuha20\": \"" + purposeEncoded + "\"");
+                        }
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
 
                 // The important metadata are only allowed to be missing if the whole row is actually empty.
                 if (sampleNumber == null || sampleNumber == 0 || canton == null || dateString == null) {
@@ -203,7 +219,8 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
                         .setOrderDate(orderDate)
                         .setCt(ct)
                         .setViollierPlateName(viollierPlateName)
-                        .setWellPosition(wellPosition);
+                        .setWellPosition(wellPosition)
+                        .setPurpose(purpose);
                 normalizeSample(sample);
                 boolean sampleOk = checkSample(sample);
                 if (!sampleOk) {
@@ -338,14 +355,14 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
 
     private Set<String> fetchAllExistingPlates(Connection conn) throws SQLException {
         String fetchSql = """
-            select extraction_plate_id
+            select extraction_plate_name
             from extraction_plate;
         """;
         Set<String> plates = new HashSet<>();
         try (Statement statement = conn.createStatement()) {
             try (ResultSet rs = statement.executeQuery(fetchSql)) {
                 while (rs.next()) {
-                    plates.add(rs.getString("extraction_plate_id"));
+                    plates.add(rs.getString("extraction_plate"));
                 }
             }
         }
@@ -370,7 +387,7 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
         StringWriter writer = new StringWriter();
         try {
             CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT
-                    .withHeader("ethid", "order_date", "ct", "extraction_plate_id", "well_position", "id_and_well"));
+                    .withHeader("ethid", "order_date", "ct", "viollier_plate_name", "well_position", "id_and_well"));
             for (Sample sample : samples) {
                 csvPrinter.printRecord(
                         sample.getSampleNumber(),
@@ -414,18 +431,19 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
 
         // Add to test_metadata (if the sample is not already in the database)
         String insertVtSql = """
-            insert into test_metadata (test_id, ethid, order_date, zip_code, city, canton, is_positive)
-            values (?, ?, ?, ?, ?, ?, true)
-            on conflict do nothing;       
+            insert into test_metadata (test_id, ethid, order_date, zip_code, city, canton, is_positive, purpose)
+            values (?, ?, ?, ?, ?, ?, true, ?)
+            on conflict do nothing;
         """;
         try (PreparedStatement statement = conn.prepareStatement(insertVtSql)) {
             for (Sample sample : samples) {
-                statement.setInt(1, sample.getTestID());
+                statement.setString(1, "viollier/" + sample.getSampleNumber());
                 statement.setInt(2, sample.getSampleNumber());
                 statement.setDate(3, Date.valueOf(sample.getOrderDate()));
                 statement.setString(4, sample.getZipCode());
                 statement.setString(5, sample.getCity());
                 statement.setString(6, sample.getCanton());
+                statement.setString(7, sample.getPurpose());
                 statement.addBatch();
             }
             statement.executeBatch();
@@ -434,14 +452,14 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
 
         // Add to extraction_plate
         String insertVp = """
-            insert into extraction_plate (extraction_plate_id, left_viollier_date, sequencing_center, comment)
+            insert into extraction_plate (extraction_plate_name, left_lab_or_received_metadata_date, sequencing_center, comment)
             values (?, ?, ?, 'The left_viollier_date might be inaccurate. It contains the date when we received the file which might not be the same date when the plate was extracted and sent.');
         """;
         try (PreparedStatement statement = conn.prepareStatement(insertVp)) {
             for (Map.Entry<String, String> plateAndSeqCenter : plateToSequencingCenter.entrySet()) {
                 String plate = plateAndSeqCenter.getKey();
                 String sequencingCenter = plateAndSeqCenter.getValue();
-                statement.setString(1, sequencingCenter + "/" + plate);
+                statement.setString(1, sequencingCenter + '/' + plate);
                 statement.setDate(2, Date.valueOf(LocalDate.now()));
                 statement.setString(3, sequencingCenter);
                 statement.addBatch();
@@ -450,24 +468,40 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
             statement.clearBatch();
         }
 
-        // Add to test_plate_mapping
-        // TODO: update insertion value according to actual test_plate_mapping columns
-        String insertVtvp = """
-            insert into test_plate_mapping (sample_number, extraction_plate_id, well_position, e_gene_ct, seq_request)
-            values (?, ?, ?, ?, true);
+        // Add to sequencing_plate
+        String insert_to_sequecing_plate = """
+            insert into sequencing_plate (sequencing_plate_name, sequencing_center, sequencing_date, comment)
+            values (?, ?, ?, '');
         """;
-        try (PreparedStatement statement = conn.prepareStatement(insertVtvp)) {
-            for (Sample sample : samples) {
-                statement.setInt(1, sample.getSampleNumber());
-                statement.setString(2, sample.getViollierPlateName());
-                statement.setString(3, sample.getWellPosition());
-                statement.setObject(4, sample.getCt());
+        try (PreparedStatement statement = conn.prepareStatement(insert_to_sequecing_plate)) {
+            for (Map.Entry<String, String> plateAndSeqCenter : plateToSequencingCenter.entrySet()) {
+                statement.setString(1, plateAndSeqCenter.getKey());
+                statement.setString(2, plateAndSeqCenter.getValue());
+                statement.setDate(3, Date.valueOf(LocalDate.now()));
                 statement.addBatch();
             }
             statement.executeBatch();
             statement.clearBatch();
         }
-        // TODO: insertion into sequencing_plate??
+
+        // Add to viollier_test_viollier_plate
+        String insertVtvp = """
+            insert into test_plate_mapping (test_id, extraction_plate, extraction_plate_well, extraction_e_gene_ct, sequencing_plate, sequencing_plate_well, sample_type)
+            values (?, ?, ?, ?, ?, ?,'clinical');
+        """;
+        try (PreparedStatement statement = conn.prepareStatement(insertVtvp)) {
+            for (Sample sample : samples) {
+                statement.setString(1, "viollier/" + sample.getSampleNumber());
+                statement.setString(2, sample.getSequencingCenter() + '/' + sample.getViollierPlateName());
+                statement.setString(3, sample.getWellPosition());
+                statement.setObject(4, sample.getCt());
+                statement.setString(5, sample.getViollierPlateName());
+                statement.setString(6, sample.getWellPosition());
+                statement.addBatch();
+            }
+            statement.executeBatch();
+            statement.clearBatch();
+        }
 
         conn.commit();
         conn.setAutoCommit(true);
