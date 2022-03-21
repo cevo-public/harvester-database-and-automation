@@ -362,7 +362,7 @@ public class ViollierMetadataReceiver extends SubProgram<ViollierMetadataReceive
         try (Statement statement = conn.createStatement()) {
             try (ResultSet rs = statement.executeQuery(fetchSql)) {
                 while (rs.next()) {
-                    plates.add(rs.getString("extraction_plate"));
+                    plates.add(rs.getString("extraction_plate_name"));
                 }
             }
         }
