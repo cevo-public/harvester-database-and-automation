@@ -13,12 +13,10 @@ class Sample {
     private Integer ct;
     private String viollierPlateName;
     private String wellPosition;
+    private String purpose;
 
     public int getSampleNumber() {
         return sampleNumber;
-    }
-    public int getTestID() {
-        return sequencingCenter + "/" + sampleNumber;
     }
 
     public Sample setSampleNumber(int sampleNumber) {
@@ -95,6 +93,15 @@ class Sample {
 
     public Sample setWellPosition(String wellPosition) {
         this.wellPosition = wellPosition;
+        return this;
+    }
+
+    public String getPurpose() {
+        return purpose;
+    }
+
+    public Sample setPurpose(String purpose) {
+        this.purpose = purpose;
         return this;
     }
 }
