@@ -123,6 +123,8 @@ collect_results <- function(std_out, std_err) {
             filename <- fields[3];
             if (grepl("_R1.", filename, fixed=TRUE))
                 r1_files[[sample_id]] <- basename(filename)
+            else if (grepl(".cram$", filename, fixed=TRUE))
+                r1_files[[sample_id]] <- basename(filename)
             else
                 r2_files[[sample_id]] <- basename(filename)
         }
