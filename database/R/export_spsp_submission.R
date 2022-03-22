@@ -127,7 +127,7 @@ get_samples_to_release <- function(db_connection, args) {
   all_plates_mapping <- dplyr::tbl(db_connection, "test_plate_mapping") %>%
     select(test_id, sequencing_plate, sequencing_plate_well) %>%
     collect()
-  all_db_seqs <- left_join(x = all_db_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"))
+  all_db_seqs <- left_join(x = all_db_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"), na_matches="never")
 
   print(log.info(
     msg = "Checking if batches are fully loaded into database.",
@@ -165,7 +165,6 @@ get_samples_to_release <- function(db_connection, args) {
 
   all_db_seqs_annotated <- all_db_seqs %>%
     mutate(first_pass_no_fail = qc_result == "no fail reason") %>%
-    ###TODO: check if it's better to group by test_id
     group_by(ethid, first_pass_no_fail) %>%
     arrange(consensus_n, .by_group = T) %>%
     mutate(
@@ -280,20 +279,23 @@ get_sample_metadata <- function(db_connection, args, samples, raw_data_file_name
     select(sample_name, coverage_mean) %>%
     collect()
   query_seqs <- left_join(x = query_seqs, y = query_seqs_additional, by = "sample_name")
-  query_seqs_is_random <- dplyr::tbl(db_connection, "consensus_sequence_notes") %>%
-    select(sample_name, purpose) %>%
-    collect()
-  query_seqs <- left_join(x = query_seqs, y = query_seqs_is_random, by = "sample_name")
   all_plates_mapping <- dplyr::tbl(db_connection, "test_plate_mapping") %>%
     select(test_id, sequencing_plate, sequencing_plate_well) %>%
     collect()
-  query_seqs <- left_join(x = query_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"))
+  query_seqs <- left_join(x = query_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"),na_matches="never")
 
   query_viollier <- dplyr::tbl(db_connection, "test_metadata") %>%  # join sequence data to sample metadata using test_id
-    select(ethid, test_id, order_date, zip_code) %>%
-    mutate(covv_orig_lab = "Viollier AG", covv_orig_lab_addr = "Hagmattstrasse 14, 4123 Allschwil", sample_number = test_id) %>%
+    select(ethid, test_id, order_date, zip_code, purpose) %>% collect()
+    query_viollier <- query_viollier %>% mutate(
+        covv_orig_lab = case_when(
+            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "viollier" ~ "Viollier AG",
+            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "team_w" ~ "labor team w AG"),
+        covv_orig_lab_addr = case_when(
+            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "viollier" ~ "Hagmattstrasse 14, 4123 Allschwil",
+            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "team_w" ~ "Blumeneggstrasse 55, 9403 Goldach")
+    ) %>%
     collect()
-    query_viollier <- query_viollier %>% mutate(sample_number = gsub(sample_number, pattern=".*/",replacement = "")) %>% collect()
+    query_viollier <- query_viollier %>% mutate(sample_number = gsub(test_id, pattern=".*/",replacement = "")) %>% collect()
 
 
    join_viollier_w_reason <- left_join(x = query_seqs, y = query_viollier, by = "test_id")
@@ -413,7 +415,7 @@ format_metadata_for_spsp <- function(metadata, args) {
         purpose %in% c("surveillance", "Surveillance") & lab_name == "Viollier AG Allschwil\r" ~ "Screening",
         purpose %in% c("diagnostic", "Diagnostic") & lab_name == "Viollier AG Allschwil\r" ~ "Unknown",
         lab_name == "Labor team w AG, St. Gallen / Goldach\r" ~ "Screening",
-        viro_purpose %in% c("outbreak", "travel case", "screening", "surveillance") ~"Screening", # SPSP vocabulary distinguishes only between Screening, Clinical signs of infection, Re-infection, Infection after vaccination, Unknown, Other as of 27.05.21
+        #viro_purpose %in% c("outbreak", "travel case", "screening", "surveillance") ~"Screening", # SPSP vocabulary distinguishes only between Screening, Clinical signs of infection, Re-infection, Infection after vaccination, Unknown, Other as of 27.05.21
         TRUE ~ "Other"),
       library_preparation_kit = case_when(
         sequencing_center == "viollier" ~ "Illumina_COVIDSeq (ARTIC V4)",
@@ -543,7 +545,7 @@ test_frameshift_table <- function(mysample, args, db_connection) {
   
   print(log.info(
     msg = paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv"),
-    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
+#    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
 
   if (!(file.exists(paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv")))) {
     return(mysample)
