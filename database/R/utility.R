@@ -313,7 +313,7 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
                                  warn_outfile = NULL,
                                  table = "consensus_sequence",
                                  sample_name_col = "sample_name",
-                                 seq_col = "seq_unaligned",
+                                 seq_col = "seq_aligned",
                                  mask_from_start = 0,
                                  mask_from_end = 0,
                                  gzip = F
