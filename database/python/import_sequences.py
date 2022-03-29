@@ -22,7 +22,7 @@ def import_sequences(
     # Connect to database
     db_connection = (
         f"dbname='{db_name}' user='{db_user}' host='{db_host}'"
-        f" password='{db_password}'"
+        f" password='{db_password}' port=9999"
     )
     try:
         conn = psycopg2.connect(db_connection)
@@ -159,11 +159,13 @@ def import_sequences(
                     " already in table.".format(sample_name)
                 )
             conn.commit()
-            print("Importing sequence {}/{}".format(i, len(found_sample_names)))
+
         except FileNotFoundError:
             print("File not found, will not import sequence:" + seq_file)
             missing_seq_file.append(sample_name)
-            pass
+            continue
+
+        print("Imported sequence {}/{}".format(i, len(found_sample_names)))
 
     cursor.close()
     conn.close()
@@ -189,8 +191,16 @@ def run_automated():
 
 def run_euler():
     print("Running in euler mode.")
-    DB_NAME = input("Enter database name:\n")
-    DB_HOST = input("Enter database host:\n")
+
+    DB_NAME = os.environ.get("DB_NAME")
+    DB_HOST = os.environ.get("DB_HOST")
+    DB_USER = os.environ.get("DB_USER")
+
+    if DB_NAME is None:
+        DB_NAME = input("Enter database name:\n")
+    if DB_HOST is None:
+        DB_HOST = input("Enter database host:\n")
+
     BATCH = input("Enter batch name to import:\n")
 
     UPDATE = None
@@ -206,13 +216,13 @@ def run_euler():
         else:
             print("You must enter either 'y' or 'n'.")
 
-    DB_USER = input(f"Enter username for database {DB_NAME}:\n")
+  
+    if DB_USER is None:
+        DB_USER = input(f"Enter username for database {DB_NAME}:\n")
+
     DB_PASSWORD = input(f"Enter password for user {DB_USER}:\n")
-    SAMPLESET_TOPLEVEL_DIR = input("Enter samples directory (no quotes!):\n")
-    SAMPLE_LIST_DIRECTORY = input(
-        "Enter full path (no quotes!) to the sample" " list directory:\n"
-    )
-    SAMPLE_LIST = os.path.join(SAMPLE_LIST_DIRECTORY, f"samples.{BATCH}.tsv")
+    SAMPLESET_TOPLEVEL_DIR = "/cluster/project/pangolin/working/samples"
+    SAMPLE_LIST = "/cluster/project/pangolin/sampleset/samples." + BATCH + ".tsv"
 
     # Get list of samples to import
     df = pd.read_csv(
