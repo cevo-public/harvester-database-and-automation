@@ -6,15 +6,15 @@
 import_sequence_qc <- function(
   db_connection, min_completion = 20000, max_excess_divergence = 15, 
   fail_frameshifts = F, overwrite_prev_qc = T) {
-  query <- dplyr::tbl(db_connection, "consensus_sequence") %>%
+  query <- dplyr::tbl(db_connection, "consensus_sequence_meta") %>%
     mutate(
-      fail_reason = case_when(
-        number_n >= 29903 - min_completion ~ paste("<", min_completion, "non-N bases"),
+      qc_result = case_when(
+        diagnostic_number_n >= 29903 - min_completion ~ paste("<", min_completion, "non-N bases"),
         !is.null(clusters) ~ flagging_reason,
-        excess_divergence > max_excess_divergence ~ paste(">", max_excess_divergence, "excess mutations"),
-        is.na(number_n) ~ "missing number_n from diagnostic.py!",
+        diagnostic_excess_divergence > max_excess_divergence ~ paste(">", max_excess_divergence, "excess mutations"),
+        is.na(diagnostic_number_n) ~ "missing number_n from diagnostic.py!",
         T ~ "no fail reason")) %>%
-    select(sample_name, ethid, fail_reason, number_n, sequencing_center, gaps)
+    select(sample_name, qc_result, diagnostic_number_n, diagnostic_gaps)
   qcd_tbl <- query %>% collect()
   
   if (fail_frameshifts) {
@@ -22,17 +22,17 @@ import_sequence_qc <- function(
       X = qcd_tbl$gaps,
       FUN = get_has_frameshift_mutation))
     qcd_tbl <- qcd_tbl %>% mutate(
-      fail_reason = case_when(
-        fail_reason == "no fail reason" & has_frameshift ~ "has frameshift deletion",
-        T ~ fail_reason))
+      qc_result = case_when(
+        qc_result == "no fail reason" & has_frameshift ~ "has frameshift deletion",
+        T ~ qc_result))
   }
   
   # Update table with QC result
   if (overwrite_prev_qc) {
     joined_fail_reasons <- qcd_tbl
   } else {
-    prev_fail_reasons <-  query <- dplyr::tbl(db_connection, "consensus_sequence") %>%
-      select(sample_name, fail_reason) %>%
+    prev_fail_reasons <-  query <- dplyr::tbl(db_connection, "consensus_sequence_meta") %>%
+      select(sample_name, qc_result) %>%
       collect()
     joined_fail_reasons <- coalesce_join(
       x = prev_fail_reasons,
@@ -41,14 +41,14 @@ import_sequence_qc <- function(
   }
   
   table_spec <- parse_table_specification(
-    table_name = "consensus_sequence", db_connection = db_connection)
+    table_name = "consensus_sequence_meta", db_connection = db_connection)
   
   update_table(
     table_name = "consensus_sequence", 
     new_table = joined_fail_reasons, 
     con = db_connection,
     append_new_rows = F, 
-    cols_to_update = c("fail_reason"),
+    cols_to_update = c("qc_result"),
     key_col = "sample_name",
     table_spec = table_spec)
 }

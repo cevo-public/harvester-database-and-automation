@@ -11,10 +11,14 @@ generate_alignment <- function(db_connection, sample_names, seq_outfile,
                                metadata_outfile, 
                                seq_table_name = "consensus_sequence",
                                sample_name_col = "sample_name",
-                               seq_col = "seq",
-                               metadata_table_name = "viollier_test",
+                               seq_col = "seq_aligned",
+                               metadata_table_name = "test_metadata",
                                key_col = "ethid",
-                               date_col = "order_date") {
+                               plate_col = "sequencing_plate",
+                               well_col = "sequencing_plate_well",
+                               date_col = "order_date",
+                               merging_table_name = "test_plate_mapping",
+                               main_key = "test_id") {
   for (file in c(seq_outfile, metadata_outfile)) {
     if (file.exists(file)) {
       system(command = paste("rm", file))
@@ -22,18 +26,23 @@ generate_alignment <- function(db_connection, sample_names, seq_outfile,
   }
   seq_query <- dplyr::tbl(db_connection, seq_table_name) %>%
     filter(!!sym(sample_name_col) %in% sample_names) %>%
-    select(!!sym(sample_name_col), !!sym(seq_col), !!sym(key_col))
+    select(!!sym(sample_name_col), !!sym(seq_col), !!sym(key_col), !!sym(plate_col), !!sym(well_col))
   seq_tbl <- seq_query %>% collect()
 
-  keys <- unlist(seq_tbl[[key_col]])
+  merging_table <- dplyr::tbl(db_connection, merging_table_name) %>%
+    select(!!sym(main_key), !!sym(plate_col), !!sym(well_col)) %>% collect()
+
+  seq_tbl <- merge(x = seq_tbl, y = merging_table, all.x = T, all.y = F)
+
+  keys <- unlist(seq_tbl[[main_key]])
   metadata_query <- dplyr::tbl(db_connection, metadata_table_name) %>%
-    filter(!!sym(key_col) %in% keys) %>%
-    select(!!sym(key_col), !!sym(date_col))
+    filter(!!sym(main_key) %in% keys) %>%
+    select(!!sym(main_key), !!sym(date_col))
   metadata_tbl <- metadata_query %>% collect()
-  if (sample_name_col == key_col) {
+  if (sample_name_col == main_key) {
     selected_cols <- sample_name_col
   } else {
-    selected_cols <- c(sample_name_col, key_col)
+    selected_cols <- c(sample_name_col, main_key)
   }
   metadata_tbl <- merge(x = metadata_tbl, y = seq_tbl[, selected_cols], all.y = T) %>%
     mutate(virus = "ncov", region = "dummy_region", date_submitted = as.Date(!!sym(date_col)) + 14) %>%
@@ -103,9 +112,9 @@ update_table_internal <- function(table_name, new_table, con) {
   DBI::dbWriteTable(con, staging_table_name, new_table)
   
   # Update diagnostic values in table based on values in staging table
-  update_sql <- "UPDATE consensus_sequence t
-  SET divergence = s.divergence, excess_divergence = s.excess_divergence, number_n = s.number_n, number_gaps = s.number_gaps, clusters = s.clusters, gaps = s.gaps, all_snps = s.all_snps, flagging_reason = s.flagging_reason
-  FROM consensus_sequence_staging s WHERE t.sample_name = s.sample_name"
+  update_sql <- "UPDATE consensus_sequence_meta t
+  SET diagnostic_divergence = s.diagnostic_divergence, diagnostic_excess_divergence = s.diagnostic_excess_divergence, diagnostic_number_n = s.diagnostic_number_n, diagnostic_number_gaps = s.diagnostic_number_gaps, diagnostic_clusters = s.diagnostic_clusters, diagnostic_gaps = s.diagnostic_gaps, diagnostic_all_snps = s.diagnostic_all_snps, diagnostic_flagging_reason = s.diagnostic_flagging_reason
+  FROM consensus_sequence_meta_staging s WHERE t.sample_name = s.sample_name"
   res <- DBI::dbSendStatement(con, update_sql)
   DBI::dbClearResult(res)
   
@@ -137,7 +146,7 @@ import_sequence_diagnostic <- function (
   # This query fetches all the sample_names that don't have diagnostic stats
   if (update_all_seqs) {
     query <- dplyr::tbl(db_connection, "consensus_sequence") %>%
-      filter(!is.null(seq)) %>%
+      filter(!is.null(seq_aligned)) %>%
       select(sample_name)
   } else if (!is.null(update_batches)) {
     query <- dplyr::tbl(db_connection, "consensus_sequence") %>%
@@ -145,10 +154,14 @@ import_sequence_diagnostic <- function (
       select(sample_name)
   } else {
     query <- dplyr::tbl(db_connection, "consensus_sequence") %>%
-      filter(!is.null(seq), is.null(number_n)) %>%
-      select(sample_name)
+      filter(!is.null(seq_aligned)) %>%
+      select(sample_name) %>% collect()
+    query_meta <- dplyr::tbl(db_connection, "consensus_sequence_meta") %>%
+      filter(!is.null(diagnostic_number_n)) %>%
+      select(sample_name) %>% collect()
+    query <- query$sample_name[query$sample_name %in% query_meta$sample_name]
   }
-  sample_names_to_diagnose <- unlist(query %>% collect())
+  sample_names_to_diagnose <- query
 
   # Because there may be many sequences, run diagnostic on chunks of chunk_size
   i <- 0
