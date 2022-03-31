@@ -24,7 +24,7 @@ mandatory_metadata_columns:
 raw_data_upload:
   server: euler.ethz.ch
   user: [USER]
-  uploads_folder: /cluster/project/panglin/working/uploads
+  uploads_folder: /cluster/project/pangolin/working/uploads
   private_key_euler: "id_ed25519_euler"
   passphrase: TOBEFILLEDIN
   max_conn: 10
