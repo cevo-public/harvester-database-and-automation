@@ -211,8 +211,9 @@ create table spectrum_owid_global_cases_raw (
 create index on spectrum_owid_global_cases_raw (region);
 create index on spectrum_owid_global_cases_raw (country);
 
+-- Only use OWID data
 create view spectrum_cases as
-select  -- Countries other than Switzerland -> OWID
+select
   scm.cov_spectrum_region as region,
   scm.cov_spectrum_country as country,
   null as division,
@@ -221,30 +222,43 @@ select  -- Countries other than Switzerland -> OWID
   coalesce(so.new_deaths, 0) as new_deaths
 from
   spectrum_owid_global_cases_raw so
-  join spectrum_country_mapping scm on so.country = scm.owid_country
-where country <> 'Switzerland'
-union all
-select  -- Number of deaths for Switzerland -> OWID
-  'Europe' as region,
-  'Switzerland' as country,
-  null as division,
-  so.date,
-  null as new_cases,
-  coalesce(so.new_deaths, 0) as new_deaths
-from spectrum_owid_global_cases_raw so
-where country = 'Switzerland'
-union all
-select  -- Number of cases for Switzerland -> BAG meldeformular, by division
-  'Europe' as region,
-  'Switzerland' as country,
-  sc.gisaid_division as division,
-  bdm.fall_dt as date,
-  count(*) as new_cases,
-  null as new_deaths
-from
-  bag_dashboard_meldeformular bdm
-  join swiss_canton sc on bdm.ktn = sc.canton_code
-group by sc.gisaid_division, bdm.fall_dt;
+  join spectrum_country_mapping scm on so.country = scm.owid_country;
+
+-- Using FOPH data for CH
+-- create view spectrum_cases as
+-- select  -- Countries other than Switzerland -> OWID
+--   scm.cov_spectrum_region as region,
+--   scm.cov_spectrum_country as country,
+--   null as division,
+--   so.date,
+--   coalesce(so.new_cases, 0) as new_cases,
+--   coalesce(so.new_deaths, 0) as new_deaths
+-- from
+--   spectrum_owid_global_cases_raw so
+--   join spectrum_country_mapping scm on so.country = scm.owid_country
+-- where country <> 'Switzerland'
+-- union all
+-- select  -- Number of deaths for Switzerland -> OWID
+--   'Europe' as region,
+--   'Switzerland' as country,
+--   null as division,
+--   so.date,
+--   null as new_cases,
+--   coalesce(so.new_deaths, 0) as new_deaths
+-- from spectrum_owid_global_cases_raw so
+-- where country = 'Switzerland'
+-- union all
+-- select  -- Number of cases for Switzerland -> BAG meldeformular, by division
+--   'Europe' as region,
+--   'Switzerland' as country,
+--   sc.gisaid_division as division,
+--   bdm.fall_dt as date,
+--   count(*) as new_cases,
+--   null as new_deaths
+-- from
+--   bag_dashboard_meldeformular bdm
+--   join swiss_canton sc on bdm.ktn = sc.canton_code
+-- group by sc.gisaid_division, bdm.fall_dt;
 
 
 grant select
