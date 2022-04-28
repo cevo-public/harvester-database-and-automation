@@ -48,7 +48,7 @@ _re_mapping = {
     ),  # eg: pos_MN908947_3_1_100000_CP0002
     _EC.POSITIVE_CONTROLS: re.compile("CoV_ctrl_"),  # eg: CoV_ctrl_1_1_10000
     _EC.ETHZ_ID_SAMPLE: re.compile(
-        "^[0-9]{6}(_Plate){0,1}_(p){0,1}[0-9]+_"
+        "^[0-9]{6}(_Plate){0,1}_(p){0,1}[0-9]+"
     ),  # eg: 160000_434_D02
     _EC.WASTEWATER_SAMPLE: re.compile("^[0-9]{2}_202[0-9]_"),  # eg: 09_2020_03_24_B
     _EC.FGCZ_SAMPLE: re.compile(
@@ -84,7 +84,7 @@ def extract_sample_condition(sample):
     """Function to parse a sample name and return its condition."""
 
     matches = [
-        condition for (condition, regex) in _re_mapping.items() if regex.match(sample)
+        condition for (condition, regex) in _re_mapping.items() if regex.search(sample)
     ]
 
     if not matches:
