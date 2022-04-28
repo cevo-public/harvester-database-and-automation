@@ -583,7 +583,7 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
     ethid <- unlist(strsplit(sample_name, split = "_"))[1]
     test_metadata <- dplyr::tbl(db_connection, "test_metadata") %>% select(test_id) %>% collect()
     in_vt_once <- nrow(
-        test_metadata %>% mutate(sample_number = unlist(lapply(strsplit(test_metadata$test_id, "/"),function(x)x[1]))) %>%
+        test_metadata %>% mutate(sample_number = unlist(lapply(strsplit(test_metadata$test_id, "/"),function(x)x[2]))) %>%
         filter(sample_number == !! ethid) %>%
         collect()) == 1
     if (in_vt_once) {

@@ -99,7 +99,7 @@ import_diagnostic <- function(db_connection, outdir, tbl_name) {
   diagnostic_transformed$clusters[diagnostic_transformed$clusters == ''] <- NA  # so that we don't end up with both blanks and nulls in the data
   # Import data
   update_table_internal(
-    table_name = tbl_name, new_table = diagnostic_transformed,
+    table_name = tbl_name_meta, new_table = diagnostic_transformed,
     con = db_connection)
 }
 
@@ -132,7 +132,7 @@ import_sequence_diagnostic <- function (
   db_connection, outdir = "data/tempdir/", chunk_size = 100, 
   update_all_seqs = FALSE, update_batches = NULL, 
   ncovdir = "python/ncov", python3 = "python3", 
-  tbl_name = "consensus_sequence") {
+  tbl_name = "consensus_sequence", tbl_name_meta = "consensus_sequence_meta") {
 
   # Make temporary directory
   if (dir.exists(outdir)) {
