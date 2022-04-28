@@ -1,0 +1,75 @@
+stages:
+  - prepare
+  - build_and_push_base_image
+  - build_and_push
+
+
+prepare:
+    stage: prepare
+    image: ubuntu:latest
+    script:
+      - apt update
+      - apt install -y git wget
+      - git clone --depth=1 --branch=master https://github.com/cov-lineages/pangolin.git
+      - rm -rf pangolin/.git
+      - git clone --depth=1 --branch=master https://gitlab.sib.swiss/SPSP/transfer-tool.git
+      - rm -rf transfer-tool/.git
+      - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh --quiet -O miniconda3.sh
+      - bash ./miniconda3.sh -b -p ./miniconda3
+      - pwd
+
+    artifacts:
+        paths:
+            - ./pangolin
+            - ./transfer-tool
+              # - ./miniconda3
+              #
+build-base:
+    stage: build_and_push_base_image
+    image:
+        name: gcr.io/kaniko-project/executor:debug
+        entrypoint: [""]
+    dependencies:
+      - prepare
+    script:
+        - mkdir -p /kaniko/.docker
+        - >
+            echo    "{
+                        \"auths\": {
+                            \"$CI_REGISTRY\": {
+                                \"username\": \"$CI_REGISTRY_USER\",
+                                \"password\": \"$CI_REGISTRY_PASSWORD\"
+                            }
+                        }
+                    }" > /kaniko/.docker/config.json
+        - cp -R database automation/base_image_r_and_python
+        - >
+             /kaniko/executor --context ${CI_PROJECT_DIR}
+             --dockerfile ${CI_PROJECT_DIR}/automation/base_image_r_and_python/Dockerfile
+             --destination $CI_REGISTRY_IMAGE:base_image_r_and_python
+             --cache=true
+             --cache-ttl=720h  # one month
+    dependencies:
+      - prepare
+
+
+build-container:
+    stage: build_and_push
+    image:
+        name: gcr.io/kaniko-project/executor:debug
+        entrypoint: [""]
+    dependencies:
+      - prepare
+    script:
+        - mkdir -p /kaniko/.docker
+        - >
+            echo    "{
+                        \"auths\": {
+                            \"$CI_REGISTRY\": {
+                                \"username\": \"$CI_REGISTRY_USER\",
+                                \"password\": \"$CI_REGISTRY_PASSWORD\"
+                            }
+                        }
+                    }" > /kaniko/.docker/config.json
+        - cd automation
+        - ./build_and_push_all_images_ci.sh
