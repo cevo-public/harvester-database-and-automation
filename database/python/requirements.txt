@@ -1,6 +1,6 @@
 attrs==20.3.0
 bcbio-gff==0.6.6
-bio==0.2.4
+bio
 biopython==1.78
 certifi==2020.12.5
 chardet==4.0.0

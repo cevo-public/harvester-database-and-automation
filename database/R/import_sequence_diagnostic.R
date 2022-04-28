@@ -32,7 +32,8 @@ generate_alignment <- function(db_connection, sample_names, seq_outfile,
   merging_table <- dplyr::tbl(db_connection, merging_table_name) %>%
     select(!!sym(main_key), !!sym(plate_col), !!sym(well_col)) %>% collect()
 
-  seq_tbl <- merge(x = seq_tbl, y = merging_table, all.x = T, all.y = F)
+  #seq_tbl <- merge(x = seq_tbl, y = merging_table, all.x = T, all.y = F)
+  seq_tbl <- left_join(x=seq_tbl, y=merging_table, by=c(plate_col, well_col), na_matches="never")
 
   keys <- unlist(seq_tbl[[main_key]])
   metadata_query <- dplyr::tbl(db_connection, metadata_table_name) %>%
@@ -128,7 +129,7 @@ update_table_internal <- function(table_name, new_table, con) {
 #' @param update_all_seqs If false, only update table for sequences without any diagnostic stats imported
 #' @param ncovdir Cloned from https://github.com/nextstrain/ncov
 import_sequence_diagnostic <- function (
-  db_connection, outdir = "data/tempdir/", chunk_size = 200, 
+  db_connection, outdir = "data/tempdir/", chunk_size = 100, 
   update_all_seqs = FALSE, update_batches = NULL, 
   ncovdir = "python/ncov", python3 = "python3", 
   tbl_name = "consensus_sequence") {
