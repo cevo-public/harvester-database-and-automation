@@ -92,25 +92,45 @@ def import_sequences(
 
     for sample_name in found_sample_names:
 
-        ethid = sample_name.split("_")[0]
-        try:
-            ethid = int(ethid)
-            cursor.execute(
-                """
-                SELECT sequencing_plate, sequencing_plate_well
-                FROM test_plate_mapping
-                JOIN test_metadata
-                ON test_plate_mapping.test_id = test_metadata.test_id
-                WHERE ethid=%s;""",
-                (ethid,),
+        sample_number = sample_name.split("_")[0]
+        cursor.execute(
+            f"""
+            SELECT test_id
+            FROM test_metadata
+            WHERE test_id LIKE '%/{sample_number}';""",
+        )
+        values = [v[0] for v in cursor.fetchall()]
+        if not values:
+            print(f"no test_id found which matches {sample_number}, skip import")
+            continue
+        if len(values) > 1:
+            print(
+                f"found multiple test_ids which match {sample_number}: {values},"
+                " skip import"
             )
-            rows = cursor.fetchall()
-            if not rows:
-                plate, well = None, None
-            else:
-                plate, well = rows[0]
-        except ValueError:
+            continue
+
+        test_id = values[0]
+
+        cursor.execute(
+            """
+            SELECT sequencing_plate, sequencing_plate_well
+            FROM test_plate_mapping
+            JOIN test_metadata
+            ON test_plate_mapping.test_id = test_metadata.test_id
+            WHERE test_metadata.test_id=%s;""",
+            (test_id,),
+        )
+
+        rows = cursor.fetchall()
+        if not rows:
+            print(
+                "test_plate_mapping inconsistency: did not find entry for"
+                f" test_id={test_id}"
+            )
             plate, well = None, None
+        else:
+            plate, well = rows[0]
 
         i += 1
         if batch is None:
@@ -124,12 +144,26 @@ def import_sequences(
         seq_unaligned = read_single(sample_name, "consensus_ambig.bcftools.fasta")
 
         try:
+            # only works for viollier data, not for teamW
+            ethid = int(sample_number)
+        except ValueError:
+            ethid = None
+
+        try:
             cursor.execute(
                 f"INSERT INTO {DEST_TABLE}"
                 " (sample_name, seq_aligned, seq_unaligned, sequencing_batch, "
-                "  sequencing_plate, sequencing_plate_well)"
+                "  sequencing_plate, sequencing_plate_well, ethid)"
                 " VALUES(%s, %s, %s, %s, %s, %s)",
-                (sample_name, seq_aligned, seq_unaligned, batch_to_import, plate, well),
+                (
+                    sample_name,
+                    seq_aligned,
+                    seq_unaligned,
+                    batch_to_import,
+                    plate,
+                    well,
+                    ethid,
+                ),
             )
             conn.commit()
         except psycopg2.errors.UniqueViolation:
@@ -216,7 +250,6 @@ def run_euler():
         else:
             print("You must enter either 'y' or 'n'.")
 
-  
     if DB_USER is None:
         DB_USER = input(f"Enter username for database {DB_NAME}:\n")
 
