@@ -79,7 +79,7 @@ run_diagnostic <- function(python_path, ncovdir, alignment, metadata, outdir) {
     "--output-exclusion-list", paste(outdir, "exclusion-list.txt", sep = "/")))
 }
 
-import_diagnostic <- function(db_connection, outdir, tbl_name) {
+import_diagnostic <- function(db_connection, outdir, tbl_name_meta) {
   # Format data
   diagnostic_transformed <- read.table(
     file = paste(outdir, "diagnostics.txt", sep = "/"), stringsAsFactors = F,
@@ -185,7 +185,7 @@ import_sequence_diagnostic <- function (
       outdir = outdir, python_path = python3)
 
     import_diagnostic(
-      db_connection = db_connection, outdir = outdir, tbl_name = tbl_name)
+      db_connection = db_connection, outdir = outdir, tbl_name_meta = tbl_name_meta)
   }
 
   system(command = paste("rm -r", outdir))
