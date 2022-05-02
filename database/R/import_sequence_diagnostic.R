@@ -114,7 +114,7 @@ update_table_internal <- function(table_name, new_table, con) {
   
   # Update diagnostic values in table based on values in staging table
   update_sql <- "UPDATE consensus_sequence_meta t
-  SET diagnostic_divergence = s.diagnostic_divergence, diagnostic_excess_divergence = s.diagnostic_excess_divergence, diagnostic_number_n = s.diagnostic_number_n, diagnostic_number_gaps = s.diagnostic_number_gaps, diagnostic_clusters = s.diagnostic_clusters, diagnostic_gaps = s.diagnostic_gaps, diagnostic_all_snps = s.diagnostic_all_snps, diagnostic_flagging_reason = s.diagnostic_flagging_reason
+  SET diagnostic_divergence = s.divergence, diagnostic_excess_divergence = s.excess_divergence, diagnostic_number_n = s.number_n, diagnostic_number_gaps = s.number_gaps, diagnostic_clusters = s.clusters, diagnostic_gaps = s.gaps, diagnostic_all_snps = s.all_snps, diagnostic_flagging_reason = s.flagging_reason
   FROM consensus_sequence_meta_staging s WHERE t.sample_name = s.sample_name"
   res <- DBI::dbSendStatement(con, update_sql)
   DBI::dbClearResult(res)
