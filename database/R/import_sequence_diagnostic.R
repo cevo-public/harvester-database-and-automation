@@ -97,6 +97,7 @@ import_diagnostic <- function(db_connection, outdir, tbl_name_meta) {
   colnames(diagnostic_transformed)[colnames(diagnostic_transformed) == "strain"] <- "sample_name"
   diagnostic_transformed$gaps[diagnostic_transformed$gaps == ''] <- NA  # not sure why, but sometimes empty gaps field read as NA and sometimes as ''
   diagnostic_transformed$clusters[diagnostic_transformed$clusters == ''] <- NA  # so that we don't end up with both blanks and nulls in the data
+  diagnostic_transformed$sample_name <- as.character(diagnostic_transformed$sample_name) #If sample names are all numbers, the column is automatically cast as "int", breaking the SQL queries
   # Import data
   update_table_internal(
     table_name = tbl_name_meta, new_table = diagnostic_transformed,

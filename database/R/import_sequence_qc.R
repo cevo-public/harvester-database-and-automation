@@ -1,8 +1,8 @@
-# This script is to update table "consensus_sequence" with sequencing qc column 
+# This script is to update table "consensus_sequence_meta" with sequencing qc column 
 # 'fail_reason'. This script DOES NOT mark duplicate sequences or distinguish 
 # between clinical samples and controls, etc.
 
-# QC consensus_sequence table entries that are not yet QC'd
+# QC consensus_sequence_meta table entries that are not yet QC'd
 import_sequence_qc <- function(
   db_connection, min_completion = 20000, max_excess_divergence = 15, 
   fail_frameshifts = F, overwrite_prev_qc = T) {
@@ -10,7 +10,7 @@ import_sequence_qc <- function(
     mutate(
       qc_result = case_when(
         diagnostic_number_n >= 29903 - min_completion ~ paste("<", min_completion, "non-N bases"),
-        !is.null(clusters) ~ flagging_reason,
+        !is.null(diagnostic_clusters) ~ diagnostic_flagging_reason,
         diagnostic_excess_divergence > max_excess_divergence ~ paste(">", max_excess_divergence, "excess mutations"),
         is.na(diagnostic_number_n) ~ "missing number_n from diagnostic.py!",
         T ~ "no fail reason")) %>%
@@ -44,7 +44,7 @@ import_sequence_qc <- function(
     table_name = "consensus_sequence_meta", db_connection = db_connection)
   
   update_table(
-    table_name = "consensus_sequence", 
+    table_name = "consensus_sequence_meta", 
     new_table = joined_fail_reasons, 
     con = db_connection,
     append_new_rows = F, 
