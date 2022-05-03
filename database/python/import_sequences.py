@@ -154,7 +154,7 @@ def import_sequences(
                 f"INSERT INTO {DEST_TABLE}"
                 " (sample_name, seq_aligned, seq_unaligned, sequencing_batch, "
                 "  sequencing_plate, sequencing_plate_well, ethid)"
-                " VALUES(%s, %s, %s, %s, %s, %s)",
+                " VALUES(%s, %s, %s, %s, %s, %s, %s)",
                 (
                     sample_name,
                     seq_aligned,
