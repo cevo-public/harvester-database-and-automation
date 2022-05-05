@@ -22,7 +22,7 @@ def import_sequences(
     # Connect to database
     db_connection = (
         f"dbname='{db_name}' user='{db_user}' host='{db_host}'"
-        f" password='{db_password}'"
+        f" password='{db_password}' port=9999"
     )
     try:
         conn = psycopg2.connect(db_connection)
@@ -92,25 +92,45 @@ def import_sequences(
 
     for sample_name in found_sample_names:
 
-        ethid = sample_name.split("_")[0]
-        try:
-            ethid = int(ethid)
-            cursor.execute(
-                """
-                SELECT sequencing_plate, sequencing_plate_well
-                FROM test_plate_mapping
-                JOIN test_metadata
-                ON test_plate_mapping.test_id = test_metadata.test_id
-                WHERE ethid=%s;""",
-                (ethid,),
+        sample_number = sample_name.split("_")[0]
+        cursor.execute(
+            f"""
+            SELECT test_id
+            FROM test_metadata
+            WHERE test_id LIKE '%/{sample_number}';""",
+        )
+        values = [v[0] for v in cursor.fetchall()]
+        if not values:
+            print(f"no test_id found which matches {sample_number}, skip import")
+            continue
+        if len(values) > 1:
+            print(
+                f"found multiple test_ids which match {sample_number}: {values},"
+                " skip import"
             )
-            rows = cursor.fetchall()
-            if not rows:
-                plate, well = None, None
-            else:
-                plate, well = rows[0]
-        except ValueError:
+            continue
+
+        test_id = values[0]
+
+        cursor.execute(
+            """
+            SELECT sequencing_plate, sequencing_plate_well
+            FROM test_plate_mapping
+            JOIN test_metadata
+            ON test_plate_mapping.test_id = test_metadata.test_id
+            WHERE test_metadata.test_id=%s;""",
+            (test_id,),
+        )
+
+        rows = cursor.fetchall()
+        if not rows:
+            print(
+                "test_plate_mapping inconsistency: did not find entry for"
+                f" test_id={test_id}"
+            )
             plate, well = None, None
+        else:
+            plate, well = rows[0]
 
         i += 1
         if batch is None:
@@ -124,12 +144,26 @@ def import_sequences(
         seq_unaligned = read_single(sample_name, "consensus_ambig.bcftools.fasta")
 
         try:
+            # only works for viollier data, not for teamW
+            ethid = int(sample_number)
+        except ValueError:
+            ethid = None
+
+        try:
             cursor.execute(
                 f"INSERT INTO {DEST_TABLE}"
                 " (sample_name, seq_aligned, seq_unaligned, sequencing_batch, "
-                "  sequencing_plate, sequencing_plate_well)"
-                " VALUES(%s, %s, %s, %s, %s, %s)",
-                (sample_name, seq_aligned, seq_unaligned, batch_to_import, plate, well),
+                "  sequencing_plate, sequencing_plate_well, ethid)"
+                " VALUES(%s, %s, %s, %s, %s, %s, %s)",
+                (
+                    sample_name,
+                    seq_aligned,
+                    seq_unaligned,
+                    batch_to_import,
+                    plate,
+                    well,
+                    ethid,
+                ),
             )
             conn.commit()
         except psycopg2.errors.UniqueViolation:
@@ -159,11 +193,13 @@ def import_sequences(
                     " already in table.".format(sample_name)
                 )
             conn.commit()
-            print("Importing sequence {}/{}".format(i, len(found_sample_names)))
+
         except FileNotFoundError:
             print("File not found, will not import sequence:" + seq_file)
             missing_seq_file.append(sample_name)
-            pass
+            continue
+
+        print("Imported sequence {}/{}".format(i, len(found_sample_names)))
 
     cursor.close()
     conn.close()
@@ -189,8 +225,16 @@ def run_automated():
 
 def run_euler():
     print("Running in euler mode.")
-    DB_NAME = input("Enter database name:\n")
-    DB_HOST = input("Enter database host:\n")
+
+    DB_NAME = os.environ.get("DB_NAME")
+    DB_HOST = os.environ.get("DB_HOST")
+    DB_USER = os.environ.get("DB_USER")
+
+    if DB_NAME is None:
+        DB_NAME = input("Enter database name:\n")
+    if DB_HOST is None:
+        DB_HOST = input("Enter database host:\n")
+
     BATCH = input("Enter batch name to import:\n")
 
     UPDATE = None
@@ -206,13 +250,12 @@ def run_euler():
         else:
             print("You must enter either 'y' or 'n'.")
 
-    DB_USER = input(f"Enter username for database {DB_NAME}:\n")
+    if DB_USER is None:
+        DB_USER = input(f"Enter username for database {DB_NAME}:\n")
+
     DB_PASSWORD = input(f"Enter password for user {DB_USER}:\n")
-    SAMPLESET_TOPLEVEL_DIR = input("Enter samples directory (no quotes!):\n")
-    SAMPLE_LIST_DIRECTORY = input(
-        "Enter full path (no quotes!) to the sample" " list directory:\n"
-    )
-    SAMPLE_LIST = os.path.join(SAMPLE_LIST_DIRECTORY, f"samples.{BATCH}.tsv")
+    SAMPLESET_TOPLEVEL_DIR = "/cluster/project/pangolin/working/samples"
+    SAMPLE_LIST = "/cluster/project/pangolin/sampleset/samples." + BATCH + ".tsv"
 
     # Get list of samples to import
     df = pd.read_csv(
