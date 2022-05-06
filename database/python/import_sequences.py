@@ -348,6 +348,8 @@ def run_euler():
             DB_NAME,
             "--batch",
             BATCH,
+            "--dbport",
+            "9999",
         ],
         stdout=subprocess.PIPE,
         text=True,
