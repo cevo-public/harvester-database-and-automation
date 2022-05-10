@@ -392,10 +392,11 @@ format_metadata_for_spsp <- function(metadata, args) {
       host_sex = "Unknown",
       isolation_source_detailed = "Respiratory specimen",
       sequencing_purpose = case_when(
-        purpose %in% c("surveillance", "Surveillance") & lab_name == "Viollier AG Allschwil\r" ~ "Screening",
+        purpose %in% c("surveillance", "Surveillance") & lab_name == "Viollier AG Allschwil\r" ~ "Surveillance",
         purpose %in% c("diagnostic", "Diagnostic") & lab_name == "Viollier AG Allschwil\r" ~ "Unknown",
-        lab_name == "Labor team w AG, St. Gallen / Goldach\r" ~ "Screening",
-        viro_purpose %in% c("outbreak", "travel case", "screening", "surveillance") ~"Screening", # SPSP vocabulary distinguishes only between Screening, Clinical signs of infection, Re-infection, Infection after vaccination, Unknown, Other as of 27.05.21
+        lab_name == "Labor team w AG, St. Gallen / Goldach\r" ~ "Surveillance",
+        viro_purpose %in% c("outbreak", "travel case", "screening") ~"Screening", # SPSP vocabulary distinguishes only between Screening, Clinical signs of infection, Re-infection, Infection after vaccination, Unknown, Other as of 27.05.21. As of May 2022 SPSP updated the vocabulary with Surveillance and Surveillance_FHOP, the latter referring to hospitalized patients
+        viro_purpose == "surveillance" ~ "Surveillance",
         TRUE ~ "Other"),
       library_preparation_kit = case_when(
         sequencing_center == "viollier" ~ "Illumina_COVIDSeq (ARTIC V4)",
