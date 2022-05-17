@@ -8,14 +8,12 @@ packages.default <- c(
     "RPostgres",
     "askpass",
     "rnaturalearth",
-    # "rgeos",
     "config",
     "emayili",
     "countrycode",
     "argparse",
     "cellranger",
-    "BiocManager",
-    "Biostrings"
+    "BiocManager"
 )
 
 packages.biocmanager <- c("Biostrings" )
@@ -23,7 +21,8 @@ packages.biocmanager <- c("Biostrings" )
 packages.all <- c(packages.default, packages.biocmanager)
 
 
-install_on_error_or_warning <- function() {
+install_on_error_or_warning <- function(err) {
+  print(err)
   lib_loc <- Sys.getenv("R_LIBS_USER")
   if (lib_loc != "") {
     print(paste("Installing packages into:", lib_loc))
