@@ -2,6 +2,7 @@ import argparse
 import os
 import subprocess
 
+from datetime import datetime
 import pandas as pd
 import psycopg2
 from Bio import SeqIO
@@ -18,6 +19,7 @@ def import_sequences(
     batch=None,
 ):
     DEST_TABLE = "consensus_sequence"
+    DEST_TABLE_META = "consensus_sequence_meta"
 
     # Connect to database
     db_connection = (
@@ -152,9 +154,10 @@ def import_sequences(
         try:
             cursor.execute(
                 f"INSERT INTO {DEST_TABLE}"
-                " (sample_name, seq_aligned, seq_unaligned, sequencing_batch, "
-                "  sequencing_plate, sequencing_plate_well, ethid)"
-                " VALUES(%s, %s, %s, %s, %s, %s, %s)",
+                "   (sample_name, seq_aligned, seq_unaligned, sequencing_batch, "
+                "    sequencing_plate, sequencing_plate_well, ethid, insert_date) "
+                #"    sequencing_center)"
+                " VALUES(%s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     sample_name,
                     seq_aligned,
@@ -163,7 +166,47 @@ def import_sequences(
                     plate,
                     well,
                     ethid,
+                    datetime.now()
+                    #sequencing_center
                 ),
+            )
+
+            cursor.execute(
+                """
+            SELECT S.sequencing_center 
+            FROM sequencing_plate as S
+            JOIN consensus_sequence as C
+            ON   S.sequencing_plate_name = C.sequencing_plate
+            WHERE C.sample_name=%s;
+            """,
+                (sample_name,),
+            )
+            sequencing_centers = cursor.fetchall()
+
+            if len(sequencing_centers) == 0:
+                print(f"cannot determine sequencing center for {sample_name}")
+                sequencing_center = None
+            elif len(sequencing_centers) > 1:
+                print(
+                    f"found multiple sequencing centers for {sample_name}:"
+                    f" {sequencing_centers}"
+                )
+                sequencing_center = None
+            else:
+                sequencing_center = sequencing_centers[0][0]
+
+            cursor.execute(
+                f"UPDATE {DEST_TABLE}"
+                " SET sequencing_center = %s WHERE sample_name = %s",
+                (
+                    sequencing_center,
+                    sample_name,
+                ),
+            )
+
+            cursor.execute(
+                f"INSERT INTO {DEST_TABLE_META} (sample_name) VALUES(%s)",
+                (sample_name,),
             )
             conn.commit()
         except psycopg2.errors.UniqueViolation:
@@ -172,21 +215,31 @@ def import_sequences(
             if update:
                 cursor.execute(
                     f"UPDATE {DEST_TABLE}"
-                    " SET seq_aligned = %s, seq_unaligned = %s, sequencing_batch = %s"
-                    " WHERE sample_name = %s",
-                    (seq_aligned, seq_unaligned, batch_to_import, sample_name),
+                    " SET seq_aligned = %s, seq_unaligned = %s, sequencing_batch = %s, "
+                    "     update_date = %s WHERE sample_name = %s",
+                    (
+                        seq_aligned,
+                        seq_unaligned,
+                        batch_to_import,
+                        datetime.now(),
+                        sample_name,
+                    ),
                 )
                 # Drop rows in nextclade tables so nextclade will be re-run on
                 # the updated sequences
                 for table in (
                     "consensus_sequence_mutation_nucleotide",
                     "consensus_sequence_mutation_aa",
-                    "consensus_sequence_sequence_meta",
+                    "consensus_sequence_meta",
                 ):
                     cursor.execute(
                         f"DELETE FROM {table} WHERE sample_name = %s",
                         (sample_name,),
                     )
+                cursor.execute(
+                    f"INSERT INTO consensus_sequence_meta (sample_name) VALUES(%s)",
+                    (sample_name,),
+                )
             else:
                 print(
                     "Not adding {} because update = False and sample"
@@ -273,6 +326,7 @@ def run_euler():
         DB_PASSWORD,
         sample_names=sample_list,
         batch=BATCH,
+        update=UPDATE,
     )
 
     # Import frameshift deletion diagnostics
@@ -294,6 +348,8 @@ def run_euler():
             DB_NAME,
             "--batch",
             BATCH,
+            "--dbport",
+            "9999",
         ],
         stdout=subprocess.PIPE,
         text=True,
