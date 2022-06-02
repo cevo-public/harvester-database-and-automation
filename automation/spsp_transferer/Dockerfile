@@ -22,7 +22,7 @@ RUN apt-get update && apt-get -y upgrade
 RUN apt-get install -y netcat #nc command
 RUN apt-get install -y gpg #gpg command
 RUN apt-get install -y openssh-client #sftp command
-RUN apt-get install -y curl  # for testing IP address
+RUN apt-get update && apt-get install -y curl  # for testing IP address
 
 # Install package for mounting a smb cifs drive
 RUN apt-get install -y cifs-utils
