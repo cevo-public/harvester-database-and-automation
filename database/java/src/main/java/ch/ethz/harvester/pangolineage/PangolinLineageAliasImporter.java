@@ -190,7 +190,7 @@ public class PangolinLineageAliasImporter extends SubProgram<PangolinLineageAlia
     }
 
     private boolean isExpectedFullName(String fullName) {
-        Pattern pattern = Pattern.compile("[A-Z]{1,2}(\\.[0-9]{1,3}){3}");
+        Pattern pattern = Pattern.compile("[A-Z]{1,2}(\\.[0-9]{1,3})*");
         Matcher matcher = pattern.matcher(fullName);
         return matcher.matches();
     }
