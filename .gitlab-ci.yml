@@ -73,3 +73,4 @@ build-container:
                     }" > /kaniko/.docker/config.json
         - cd automation
         - ./build_and_push_all_images_ci.sh
+    retry: 1  # kaniko is sometimes a bit fragile
