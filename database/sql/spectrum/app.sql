@@ -314,6 +314,10 @@ on table
   spectrum_collection_variant
 to spectrum;
 
+grant usage on
+  spectrum_collection_id_seq,
+  spectrum_collection_variant_id_seq
+to spectrum;
 
 grant usage, select
 on sequence
