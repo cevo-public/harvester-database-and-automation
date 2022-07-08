@@ -211,6 +211,25 @@ create table spectrum_owid_global_cases_raw (
 create index on spectrum_owid_global_cases_raw (region);
 create index on spectrum_owid_global_cases_raw (country);
 
+create table spectrum_collection (
+  id serial primary key,
+  title text not null,
+  description text not null,
+  maintainers text not null,
+  email text not null,
+  admin_key text not null
+);
+
+create table spectrum_collection_variant (
+  id serial primary key,
+  collection_id integer references spectrum_collection on update cascade on delete cascade,
+  query text not null,
+  name text not null,
+  description text not null
+);
+
+create index on spectrum_collection_variant (collection_id);
+
 -- Only use OWID data
 create view spectrum_cases as
 select
@@ -287,6 +306,12 @@ on table
   spectrum_new_interesting_variant,
   spectrum_api_usage_sample,
   spectrum_api_cache_sample
+to spectrum;
+
+grant select, insert, update, delete
+on table
+  spectrum_collection,
+  spectrum_collection_variant
 to spectrum;
 
 
