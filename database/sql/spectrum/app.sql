@@ -213,6 +213,8 @@ create index on spectrum_owid_global_cases_raw (country);
 
 create table spectrum_collection (
   id serial primary key,
+  creation_date timestamp not null,
+  last_update_date timestamp not null,
   title text not null,
   description text not null,
   maintainers text not null,
