@@ -75,12 +75,12 @@ for (i in 1:nrow(sample_info)) {
 }
 
 filename <- paste0(Sys.Date(), "_seq_info.csv")
-write.csv(sample_info, file = paste0("data/viollier_seq_requests/", filename))
+#write.csv(sample_info, file = paste0("data/viollier_seq_requests/", filename))
 write.csv(sample_info, file = paste(base_dest_dir, filename, sep = "/"))
 
 if (continue == 'y') {
   print(paste("Running command:", upload_viollier_sync_command))
-  system(command = sync_command)
+  system(command = upload_viollier_sync_command)
 } else {
   print("Not initiating synchronization.")
 }

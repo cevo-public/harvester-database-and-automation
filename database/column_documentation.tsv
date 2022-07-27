@@ -82,6 +82,7 @@ viollier_test	city	The city of the office of the doctor.
 viollier_test	canton	The canton of the office of the doctor.
 viollier_test	pcr_code	A technical code set by Viollier. 4 corresponds to a positive test.
 viollier_test	is_positive	Whether a test is positive it should be true if and only if pcr_code is 4.
+viollier_test	purpose	The sampling strategy/purpose: allowed values are currently ""surveillance"" and ""diagnostic""
 viollier_test	sequenced_by_viollier	Whether the plate was sequenced by Viollier; Viollier started sequencing in week 15/16 of 2021.
 viollier_test	comment	Additional information as free text.
 viollier_test__viollier_plate		Connects the viollier_test and viollier_plate table
