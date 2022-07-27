@@ -10,20 +10,21 @@ import_fgcz_failed_seqs <- function(
   for (file_i in files_to_import) {
     sequencing_batch <- strsplit(x = file_i, split = "\\.")[[1]][2]
     sample_names <- read.delim(file = paste(sampleset_dir, file_i, sep = "/"), header = F)
-    sample_names[, 1] <- as.character(sample_names[, 1])
+    sample_names <- as.character(sample_names$V1);
 
     failed_seq_data <- data.frame(
-      sample_name = sample_names$V1,
+      sample_name = sample_names,
       sequencing_batch = sequencing_batch,
-      seq = paste0(rep("N", 29903), collapse = ""),
+      seq_aligned = paste0(rep("N", 29903), collapse = ""),
+      seq_unaligned = paste0(rep("N", 29903), collapse = ""),
       sequencing_center = "fgcz"
     )
 
     # Skip if any failed seqs already in database - maybe they were re-run in another batch and succeeded?
     db_sample_data <- dplyr::tbl(db_connection, "consensus_sequence") %>%
-      filter(sample_name %in% !! sample_names$V1) %>%
-      select(sample_name, number_n) %>%
-      collect()
+      select(sample_name, sequencing_batch, sequencing_center, seq_aligned, seq_unaligned) %>%
+      filter(sample_name %in% !! sample_names) %>% collect()
+
     if (nrow(db_sample_data) > 0) {
       print(paste("Not importing", nrow(db_sample_data), "out of", nrow(failed_seq_data),
                   "failed samples because they're already in consensus_sequence."))
@@ -38,7 +39,7 @@ import_fgcz_failed_seqs <- function(
       table_name = "consensus_sequence",
       new_table = failed_seq_data,
       con = db_connection,
-      cols_to_update = c("seq", "sequencing_batch", "sequencing_center"),
+      cols_to_update = c("seq_aligned", "seq_unaligned", "sequencing_batch", "sequencing_center"),
       key_col = "sample_name",
       table_spec = table_spec
     )

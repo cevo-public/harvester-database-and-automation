@@ -108,11 +108,26 @@ get_samples_to_release <- function(db_connection, args) {
       ethid,
       sequencing_center,
       sequencing_batch,
-      consensus_n,
-      number_n,
-      fail_reason,
-      dont_release) %>%
+      sequencing_plate,
+      sequencing_plate_well) %>%
     collect()
+
+  all_db_seqs_additional <- dplyr::tbl(db_connection, "consensus_sequence_meta") %>%
+    select(
+      sample_name,
+      consensus_n,
+      diagnostic_number_n,
+      qc_result) %>%
+    collect()
+  all_db_seqs <- left_join(x = all_db_seqs, y = all_db_seqs_additional, by = "sample_name")
+  all_db_seqs_notes <- dplyr::tbl(db_connection, "consensus_sequence_notes") %>%
+    select(sample_name, release_decision) %>%
+    collect()
+  all_db_seqs <- left_join(x = all_db_seqs, y = all_db_seqs_notes, by = "sample_name")
+  all_plates_mapping <- dplyr::tbl(db_connection, "test_plate_mapping") %>%
+    select(test_id, sequencing_plate, sequencing_plate_well) %>%
+    collect()
+  all_db_seqs <- left_join(x = all_db_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"), na_matches="never")
 
   print(log.info(
     msg = "Checking if batches are fully loaded into database.",
@@ -128,7 +143,7 @@ get_samples_to_release <- function(db_connection, args) {
     msg = "Checking if sequence in database consensus_n matches sequence on D-BSSE server number_n.",
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
   seq_discrepencies <- all_db_seqs %>%
-    filter(number_n != consensus_n)
+    filter(diagnostic_number_n != consensus_n)
 
   print(log.info(
     msg = "Checking if sequences previously submitted or released.",
@@ -138,43 +153,42 @@ get_samples_to_release <- function(db_connection, args) {
     collect()
 
   print(log.info(
-    msg = "Checking if sequences have associated metadata in viollier_test or non_viollier_test.",
+    msg = "Checking if sequences have associated metadata in test_metadata.",
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
-  has_vt_metadata <- unlist(
-    dplyr::tbl(db_connection, "viollier_test") %>% select(ethid) %>% collect())
-  has_nvt_metadata <- unlist(
-    dplyr::tbl(db_connection, "non_viollier_test") %>% select(sample_name) %>% collect())
-  has_metadata <- all_db_seqs$ethid[(all_db_seqs$ethid %in% has_vt_metadata) |
-    (all_db_seqs$sample_name %in% has_nvt_metadata)]
+   has_test_metadata <- unlist(
+     dplyr::tbl(db_connection, "test_metadata") %>% select(test_id) %>% collect())
+   has_metadata <- all_db_seqs$test_id[(all_db_seqs$test_id %in% has_test_metadata)]
 
   print(log.info(
     msg = "Annotating sequences in database with reasons not to release, if any.",
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
 
   all_db_seqs_annotated <- all_db_seqs %>%
-    mutate(first_pass_no_fail = fail_reason == "no fail reason") %>%
+    mutate(first_pass_no_fail = qc_result == "no fail reason") %>%
     group_by(ethid, first_pass_no_fail) %>%
     arrange(consensus_n, .by_group = T) %>%
     mutate(
       duplicate_idx = row_number(),
-      fail_reason = case_when(
+      qc_result = case_when(
         !(sequencing_batch %in% finalized_batches) ~ "sequencing batch not finalized according to table sequencing_batch_status",
-        dont_release ~ "column dont_release in consensus_sequence is true",
+        release_decision ~ "column release_decision in consensus_sequence is true",
+        #TODO: check if I need to go with with TEST_ID
         ethid %in% released$ethid ~ "ethid already released or submitted",
-        !(ethid %in% has_metadata) ~ "no metadata in viollier_test or non_viollier_test",
-        fail_reason == "no fail reason" & is.na(ethid) ~ "null ethid",
-        fail_reason == "no fail reason" & duplicate_idx > 1 ~ "less complete duplicate",
+        !(test_id %in% has_metadata) ~ "no metadata in test_metadata",
+        qc_result == "no fail reason" & is.na(ethid) ~ "null ethid",
+        qc_result == "no fail reason" & duplicate_idx > 1 ~ "less complete duplicate",
         sample_name %in% seq_discrepencies$sample_name ~ "sequence discrepency between D-BSSE server and database",
-        T ~ fail_reason),
+        T ~ qc_result),
         warning_reason = case_when(
             sequencing_batch %in% incomplete_batches ~ "data from batch not completely loaded into database")) %>%
     ungroup()
 
+  #TODO: check if after mutating you can move on using the new fail_reason and warning reason
   fail_reason_summary <- summarize_fail_reasons(all_db_seqs_annotated)
   report_suspicious_batches(fail_reason_summary, args)
   report_null_ethids(all_db_seqs_annotated, args)
 
-  to_release <- all_db_seqs_annotated %>% filter(fail_reason == "no fail reason")
+  to_release <- all_db_seqs_annotated %>% filter(qc_result == "no fail reason")
   print(log.info(
     msg = paste("Found", nrow(to_release), "sequences in database to release."),
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
@@ -187,7 +201,7 @@ get_samples_to_release <- function(db_connection, args) {
 #' @return Dataframe of fail reasons by batch.
 summarize_fail_reasons <- function(all_db_seqs_annotated) {
   fail_reason_summary <- all_db_seqs_annotated %>%
-    group_by(sequencing_center, sequencing_batch, fail_reason, warning_reason) %>%
+    group_by(sequencing_center, sequencing_batch, qc_result, warning_reason) %>%
     summarize(seq_count = n(), .groups = "drop") %>%
     group_by(sequencing_batch) %>%
     mutate(
@@ -209,9 +223,9 @@ report_suspicious_batches <- function(fail_reason_summary, args) {
     fail_reason_summary %>%
       filter(
         batch_date > Sys.Date() - 21,
-        (fail_reason == "ethid already released or submitted" & frac_batch < 0.8) |
+        (qc_result == "ethid already released or submitted" & frac_batch < 0.8) |
           warning_reason == "data from batch not completely loaded into database" |
-          fail_reason == "no fail reason" & frac_batch < 0.8) %>%
+          qc_result == "no fail reason" & frac_batch < 0.8) %>%
       select(sequencing_batch))
   suspicious_batch_summary <- fail_reason_summary %>%
     filter(sequencing_batch %in% suspicious_batches)
@@ -221,7 +235,7 @@ report_suspicious_batches <- function(fail_reason_summary, args) {
       format_dataframe_for_log(
         suspicious_batch_summary %>%
           mutate(seq_count = paste(seq_count, "samples")) %>%
-          select(sequencing_center, sequencing_batch, fail_reason, warning_reason, seq_count)),
+          select(sequencing_center, sequencing_batch, qc_result, warning_reason, seq_count)),
       sep = "\n")
     print(notify.warn(
       msg = suspicious_batch_message,
@@ -236,7 +250,7 @@ report_suspicious_batches <- function(fail_reason_summary, args) {
 #' Warn when no ETHID is found (these should be controls).
 report_null_ethids <- function(all_db_seqs_annotated, args) {
   null_ethid_summary <- all_db_seqs_annotated %>%
-    filter(fail_reason == "null ethid") %>%
+    filter(qc_result == "null ethid") %>%
     select(sequencing_center, sequencing_batch, sample_name)
   if (nrow(null_ethid_summary) > 1) {
     null_ethid_message <- paste(
@@ -259,40 +273,46 @@ get_sample_metadata <- function(db_connection, args, samples, raw_data_file_name
     fcn = paste0(args$script_name, "::", "get_sample_metadata")))
   query_seqs <- dplyr::tbl(db_connection, "consensus_sequence") %>%
     filter(sample_name %in% !! samples) %>%
-    select(sample_name, ethid, coverage, sequencing_center, sequencing_batch, is_random)
+    select(sample_name, sequencing_plate, sequencing_plate_well, sequencing_center, sequencing_batch) %>%
+    collect()
+  query_seqs_additional <- dplyr::tbl(db_connection, "consensus_sequence_meta") %>%
+    select(sample_name, coverage_mean) %>%
+    collect()
+  query_seqs <- left_join(x = query_seqs, y = query_seqs_additional, by = "sample_name")
+  all_plates_mapping <- dplyr::tbl(db_connection, "test_plate_mapping") %>%
+    select(test_id, sequencing_plate, sequencing_plate_well) %>%
+    collect()
+  query_seqs <- left_join(x = query_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"),na_matches="never")
 
-  query_viollier <- dplyr::tbl(db_connection, "viollier_test") %>%  # join sequence data to sample metadata using ethid
-    select(ethid, sample_number, order_date, zip_code, purpose) %>%
-    mutate(covv_orig_lab = "Viollier AG", covv_orig_lab_addr = "Hagmattstrasse 14, 4123 Allschwil")
-  join_viollier <- left_join(x = query_seqs, y = query_viollier, by = "ethid")
-  query_bag_sequence_report <- dplyr::tbl(db_connection, "bag_sequence_report") %>%
-    select(auftraggeber_nummer, alt_seq_id, viro_purpose)
-  join_viollier_w_reason <- left_join(  # merge in sequencing reason
-    x = join_viollier,
-    y = query_bag_sequence_report,
-    by = c("sample_number" = "auftraggeber_nummer"))
+  query_viollier <- dplyr::tbl(db_connection, "test_metadata") %>%  # join sequence data to sample metadata using test_id
+    select(ethid, test_id, order_date, zip_code, purpose) %>% collect()
+    query_viollier <- query_viollier %>% mutate(
+        covv_orig_lab = case_when(
+            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "viollier" ~ "Viollier AG",
+            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "team_w" ~ "labor team w AG"),
+        covv_orig_lab_addr = case_when(
+            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "viollier" ~ "Hagmattstrasse 14, 4123 Allschwil",
+            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "team_w" ~ "Blumeneggstrasse 55, 9403 Goldach")
+    ) %>%
+    collect()
+    query_viollier <- query_viollier %>% mutate(sample_number = gsub(test_id, pattern=".*/",replacement = "")) %>% collect()
+
+
+   join_viollier_w_reason <- left_join(x = query_seqs, y = query_viollier, by = "test_id")
+#   join_viollier <- left_join(x = query_seqs, y = query_viollier, by = "test_id")
+#  query_bag_sequence_report <- dplyr::tbl(db_connection, "bag_sequence_report") %>%
+#    select(auftraggeber_nummer, alt_seq_id, viro_purpose) %>% collect()
+#  join_viollier_w_reason <- left_join(  # merge in sequencing reason
+#    x = join_viollier,
+#    y = query_bag_sequence_report,
+#    by = c("sample_number" = "auftraggeber_nummer"))
 
   query_canton_code <- dplyr::tbl(db_connection, "swiss_postleitzahl") %>%  # get canton based on zip_code in metadata since canton is sometimes missing
     select(plz, canton) %>%
-    rename(zip_code = plz)
+    rename(zip_code = plz) %>% collect()
   join_canton <- left_join(x = join_viollier_w_reason, y = query_canton_code, by = "zip_code")
-  viollier_metadata <- join_canton %>% collect()
 
-  query_non_viollier <- dplyr::tbl(db_connection, "non_viollier_test") %>%  # merge in special sample metadata
-    filter(sample_name %in% !! samples)
-  join_canton_non_viollier <- left_join(x = query_non_viollier, y = query_canton_code, by = "zip_code")
-  non_viollier_metadata <- join_canton_non_viollier %>%  # merge in sequencing reason
-    left_join(
-        y = query_bag_sequence_report,
-        by = c("sample_name" = "alt_seq_id")) %>%
-        collect()
-  non_viollier_metadata <- non_viollier_metadata %>%
-    mutate(
-      canton = coalesce(`canton.y`, `canton.x`)) %>%  # prefer canton matched from zip code, otherwise take from canton column if filled
-    select(-c(`canton.y`, `canton.x`))
-
-  seq_metadata <- coalesce_join(
-    x = viollier_metadata, y = non_viollier_metadata, by = "sample_name", all = T)
+  seq_metadata <- join_canton
 
   seq_metadata <- seq_metadata %>% dplyr::left_join(
     y = dplyr::tbl(db_connection, "lab_code_foph") %>% collect(),
@@ -408,7 +428,7 @@ format_metadata_for_spsp <- function(metadata, args) {
         sequencing_center == "fgcz" ~ "Nextera XT (ARTIC V4)"),
       sequencing_platform = "Combination Illumina MiSeq and Illumina NovaSeq 5000/6000",
       assembly_method = "V-pipe",
-      raw_dataset_coverage = round(coverage, digits = 0),
+      raw_dataset_coverage = round(coverage_mean, digits = 0),
       reporting_lab_name = "Department of Biosystems Science and Engineering, ETH Zürich; Mattenstrasse 26, 4058 Basel",
       reporting_lab_order_id = sample_name,
       collecting_lab_name = paste(covv_orig_lab, covv_orig_lab_addr, sep = "; "),

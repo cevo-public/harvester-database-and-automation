@@ -22,10 +22,10 @@ mandatory_metadata_columns:
   reporting_authors
   orig_fastq_name_forward
 raw_data_upload:
-  server:
-  user:
-  uploads_folder:
-  private_key_euler:
-  passphrase:
+  server: euler.ethz.ch
+  user: [USER]
+  uploads_folder: /cluster/project/pangolin/working/uploads
+  private_key_euler: "id_ed25519_euler"
+  passphrase: TOBEFILLEDIN
   max_conn: 10
   max_samples_per_call: 200

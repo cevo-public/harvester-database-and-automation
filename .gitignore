@@ -1,2 +1,8 @@
-# vim backup files
-.*.sw?
+# Editors
+.idea/
+
+# Configs
+database/config.yml
+
+# 
+logs

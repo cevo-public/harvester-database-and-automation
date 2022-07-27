@@ -1,0 +1,23 @@
+version: '3.5'
+
+volumes:
+  pgdata:
+  
+services:
+  db:
+    image: 'registry.ethz.ch/sars_cov_2/harvester-database-and-automation:postgres-dev'
+    container_name: 'sars-cov-2-database-dev'
+    restart: 'always'
+    ports:
+      - 5432:5432
+    volumes:
+      - 'pgdata:/var/lib/postgresql/data'
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .dev.env
+

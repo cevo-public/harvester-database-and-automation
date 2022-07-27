@@ -32,7 +32,7 @@ public class NucleotideMutationFinder {
     public static String loadReferenceGenome(Connection conn) throws SQLException {
         String sql = """
             select upper(cs.seq) as seq
-            from consensus_sequence cs
+            from backup_220530_consensus_sequence cs
             where sample_name = 'REFERENCE_GENOME';
         """;
         try (Statement statement = conn.createStatement()) {

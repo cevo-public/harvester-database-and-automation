@@ -23,7 +23,7 @@ import_nextclade_mutations_aa <- function (db_connection, nextclade_file) {
     )
 
   DBI::dbBegin(db_connection)
-  DBI::dbAppendTable(db_connection, name = "consensus_sequence_nextclade_mutation_aa", nextclade_mutations_aa)
+  DBI::dbAppendTable(db_connection, name = "consensus_sequence_mutation_aa", nextclade_mutations_aa)
   DBI::dbCommit(db_connection)
 
   return(nextclade_mutations_aa)
@@ -101,7 +101,48 @@ import_nextclade_data_without_mutations <- function (db_connection, nextclade_fi
       nextclade_qc_snp_clusters_status, nextclade_qc_snp_clusters_total, nextclade_errors
     )
 
-  DBI::dbAppendTable(db_connection, name = "consensus_sequence_nextclade_data", nextclade_data)
+  table_spec <- parse_table_specification(
+    table_name = "consensus_sequence_meta", db_connection = db_connection)
+  update_table(
+    "consensus_sequence_meta",
+    nextclade_data,
+    db_connection,
+    append_new_rows = FALSE,
+    cols_to_update = c(
+      "nextclade_clade",
+      "nextclade_qc_overall_score",
+      "nextclade_qc_overall_status",
+      "nextclade_total_gaps",
+      "nextclade_total_insertions",
+      "nextclade_total_missing",
+      "nextclade_total_mutations",
+      "nextclade_total_non_acgtns",
+      "nextclade_total_pcr_primer_changes",
+      "nextclade_alignment_start",
+      "nextclade_alignment_end",
+      "nextclade_alignment_score",
+      "nextclade_qc_missing_data_score",
+      "nextclade_qc_missing_data_status",
+      "nextclade_qc_missing_data_total",
+      "nextclade_qc_mixed_sites_score",
+      "nextclade_qc_mixed_sites_status",
+      "nextclade_qc_mixed_sites_total",
+      "nextclade_qc_private_mutations_cutoff",
+      "nextclade_qc_private_mutations_excess",
+      "nextclade_qc_private_mutations_score",
+      "nextclade_qc_private_mutations_status",
+      "nextclade_qc_private_mutations_total",
+      "nextclade_qc_snp_clusters_clustered",
+      "nextclade_qc_snp_clusters_score",
+      "nextclade_qc_snp_clusters_status",
+      "nextclade_qc_snp_clusters_total",
+      "nextclade_errors"
+    ),
+    key_col = "sample_name",
+    table_spec = table_spec,
+    close_con = FALSE
+  )
+  DBI::dbCommit(db_connection)
   return(nextclade_data)
 }
 
@@ -155,17 +196,11 @@ import_gisaid_nextclade_mutations_aa <- function (db_connection, nextclade_file,
 
 get_sample_names_without_nextclade <- function (db_connection) {
   sql <- "
-    select sample_name
-    from consensus_sequence cs
-    where
-      cs.seq is not null
-      and not exists (
-        select
-        from consensus_sequence_nextclade_data n
-        where cs.sample_name = n.sample_name
-      )
-     order by random()
-     limit 5000;
+    select csm.sample_name
+    from consensus_sequence_meta csm
+    where csm.nextclade_qc_overall_score is null
+    order by random()
+    limit 5000;
   "
   res <- DBI::dbSendQuery(conn = db_connection, statement = sql)
   data <- DBI::dbFetch(res)

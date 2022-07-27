@@ -54,7 +54,7 @@ The plate(s): %s
 
 Best,
 Harvester
-(On behalf of Chaoran and Sarah)
+(On behalf of the ETH covid sequence surveillance team)
 """.formatted(
                 plates.size(),
                 numberSamples,

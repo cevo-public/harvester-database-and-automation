@@ -1,3 +1,45 @@
+-- General data for Switzerland
+
+-- Demographic balance by age and canton (px-x-0102020000_104)
+-- Provided by the Swiss Federal Statistical Office
+-- https://www.pxweb.bfs.admin.ch/pxweb/en/px-x-0102020000_104/px-x-0102020000_104/px-x-0102020000_104.px
+create table ext_swiss_demographic
+(
+	demographic_component text not null,
+	canton text not null,
+	sex text not null,
+	age int not null,
+	year int not null,
+	count int not null,
+	primary key (demographic_component, canton, sex, age, year)
+);
+
+-- Other general data
+
+create table country
+(
+  iso_code text primary key,
+  iso_code_numeric int unique,
+  name_english text not null unique,
+  name_german text unique,
+  name_french text unique,
+  name_italian text unique,
+  region text not null
+);
+
+
+-- A small collection of country information that are needed/useful.
+-- The german names are those used in the BAG meldeformular and are not complete at all.
+create table country_old
+(
+  iso3166_alpha3_code text primary key,
+  german_name text,
+  english_name text
+);
+
+
+
+
 -- Sequencing batch status
 create table sequencing_batch_status (
   sequencing_batch text primary key,
@@ -19,38 +61,7 @@ create table foph_travel_quarantine (
   date_effective date not null
 );
 
--- Frameshift deletion diagnostics output by V-pipe
-create table frameshift_deletion_diagnostic (
-  sample_name text not null
-    references consensus_sequence on delete cascade,
-  start_position int not null,
-  indel_type text,
-  length int not null,
-  gene_region text,
-  reads_all int,
-  reads_fwd int,
-  reads_rev int,
-  deletions int,
-  freq_del float,
-  freq_del_fwd float,
-  freq_del_rev float,
-  deletions_fwd int,
-  deletions_rev int,
-  insertions int,
-  freq_insert float,
-  freq_insert_fwd float,
-  freq_insert_rev float,
-  insertions_fwd int,
-  insertions_rev int,
-  matches_ref int,
-  pos_critical_inserts text,
-  pos_critical_dels text,
-  homopolymeric boolean,
-  ref_base text,
-  indel_diagnosis text,
-  indel_position text,
-  primary key (sample_name, start_position, indel_type)
-);
+
 
 create type date_type as enum (
   'DAY', 'WEEK', 'MONTH', 'QUARTER', 'YEAR'
@@ -479,6 +490,38 @@ create table variant_mutation_aa
 	primary key (variant_name, aa_mutation)
 );
 
+-- Frameshift deletion diagnostics output by V-pipe
+create table frameshift_deletion_diagnostic (
+  sample_name text not null
+    references consensus_sequence on delete cascade,
+  start_position int not null,
+  indel_type text,
+  length int not null,
+  gene_region text,
+  reads_all int,
+  reads_fwd int,
+  reads_rev int,
+  deletions int,
+  freq_del float,
+  freq_del_fwd float,
+  freq_del_rev float,
+  deletions_fwd int,
+  deletions_rev int,
+  insertions int,
+  freq_insert float,
+  freq_insert_fwd float,
+  freq_insert_rev float,
+  insertions_fwd int,
+  insertions_rev int,
+  matches_ref int,
+  pos_critical_inserts text,
+  pos_critical_dels text,
+  homopolymeric boolean,
+  ref_base text,
+  indel_diagnosis text,
+  indel_position text,
+  primary key (sample_name, start_position, indel_type)
+);
 
 -- Swiss postal codes
 create table swiss_postleitzahl (
@@ -625,51 +668,6 @@ create table bag_meldeformular (
 );
 
 
--- General data for Switzerland
-
--- Demographic balance by age and canton (px-x-0102020000_104)
--- Provided by the Swiss Federal Statistical Office
--- https://www.pxweb.bfs.admin.ch/pxweb/en/px-x-0102020000_104/px-x-0102020000_104/px-x-0102020000_104.px
-create table ext_swiss_demographic
-(
-	demographic_component text not null,
-	canton text not null,
-	sex text not null,
-	age int not null,
-	year int not null,
-	count int not null,
-	primary key (demographic_component, canton, sex, age, year)
-);
-
-create index switzerland_demographic_demographic_component_index
-	on switzerland_demographic (demographic_component);
-
-create index switzerland_demographic_year_index
-	on switzerland_demographic (year);
-
-
--- Other general data
-
-create table country
-(
-  iso_code text primary key,
-  iso_code_numeric int unique,
-  name_english text not null unique,
-  name_german text unique,
-  name_french text unique,
-  name_italian text unique,
-  region text not null
-);
-
-
--- A small collection of country information that are needed/useful.
--- The german names are those used in the BAG meldeformular and are not complete at all.
-create table country_old
-(
-  iso3166_alpha3_code text primary key,
-  german_name text,
-  english_name text
-);
 
 
 -- Data is updated every day and is provided by the BAG through a Polybox
@@ -974,3 +972,382 @@ create table ext_problematic_site
   filter text not null,
   info text
 );
+
+create table lab_code_foph
+(
+  lab_code_foph integer not null primary key,
+  lab_name text,
+  covv_orig_lab text
+);
+
+create table new_sequence
+(
+  id serial primary key,
+  batch character varying,
+  sample character varying,
+  header character varying,
+  created timestamp with time zone,
+  checksum_seguid character varying,
+  checksum_crc64 character varying,
+  sequence character varying
+);
+
+create table non_viollier_test
+(
+  sample_name text not null primary key,
+  order_date date,
+  zip_code text,
+  sample_number integer,
+  covv_orig_lab text,
+  covv_orig_lab_addr text,
+  canton text,
+  comment text
+);
+
+create table sequence_staging
+(
+  gisaid_id text,
+  ethid integer
+);
+
+create table swiss_wastewater_plant
+(
+  plant_number integer not null primary key,
+  location text,
+  canton text
+);
+create unique index wastewater_plant_plant_number_uindex on swiss_wastewater_plant (plant_number);
+
+create table gisaid_country
+(
+  gisaid_country text not null primary key,
+  iso_country text
+);
+
+create index gisaid_country_gisaid_country_idx on gisaid_country(gisaid_country);
+create index gisaid_country_iso_country_idx on gisaid_country(iso_country);
+
+create table gisaid_sequence_staging(
+  strain text not null primary key,
+  virus text,
+  gisaid_epi_isl  text,
+  genbank_accession text,
+  date  date,
+  date_str text,
+  region  text,
+  country  text,
+  division text,
+  location text,
+  region_exposure text,
+  country_exposure text,
+  division_exposure text,
+  segment text,
+  length integer,
+  host text,
+  age integer,
+  sex text,
+  nextstrain_clade text,
+  pangolin_lineage text,
+  gisaid_clade text,
+  originating_lab text,
+  submitting_lab text,
+  authors text,
+  url text,
+  title text,
+  paper_url text,
+  date_submitted date,
+  original_seq text,
+  aligned_seq text,
+  purpose_of_sequencing text,
+  nextclade_clade text,
+  nextclade_qc_overall_score  double precision,
+  nextclade_qc_overall_status            text,
+  nextclade_total_gaps                   integer,
+  nextclade_total_insertions             integer,
+  nextclade_total_missing                integer,
+  nextclade_total_mutations              integer,
+  nextclade_total_non_acgtns             integer,
+  nextclade_total_pcr_primer_changes     integer,
+  nextclade_alignment_start              integer,
+  nextclade_alignment_end                integer,
+  nextclade_alignment_score              integer,
+  nextclade_qc_missing_data_score        double precision,
+  nextclade_qc_missing_data_status       text,
+  nextclade_qc_missing_data_total        integer,
+  nextclade_qc_mixed_sites_score         double precision,
+  nextclade_qc_mixed_sites_status        text,
+  nextclade_qc_mixed_sites_total         integer,
+  nextclade_qc_private_mutations_cutoff  integer,
+  nextclade_qc_private_mutations_excess  integer,
+  nextclade_qc_private_mutations_score   double precision,
+  nextclade_qc_private_mutations_status  text,
+  nextclade_qc_private_mutations_total   integer,
+  nextclade_qc_snp_clusters_clustered    text,
+  nextclade_qc_snp_clusters_score        double precision,
+  nextclade_qc_snp_clusters_status       text,  
+  nextclade_qc_snp_clusters_total        integer,
+  nextclade_errors                       text,
+  iso_country                            text
+    references country(iso_code),
+  iso_country_exposure                   text
+    references country(iso_code)
+);
+create index gisaid_sequence_age_index2  on gisaid_sequence_staging (age);
+create index gisaid_sequence_country_exposure_index2  on gisaid_sequence_staging (country_exposure);
+create index gisaid_sequence_country_index2  on gisaid_sequence_staging (country);
+create index gisaid_sequence_date_index2  on gisaid_sequence_staging (date);
+create index gisaid_sequence_date_submitted_index2  on gisaid_sequence_staging (date_submitted);
+create index gisaid_sequence_division_exposure_index2  on gisaid_sequence_staging (division_exposure);
+create index gisaid_sequence_division_index2  on gisaid_sequence_staging (division);
+create index gisaid_sequence_gisaid_epi_isl_index2  on gisaid_sequence_staging (gisaid_epi_isl);
+create index gisaid_sequence_host_index2  on gisaid_sequence_staging (host);
+create index gisaid_sequence_originating_lab_index2  on gisaid_sequence_staging (originating_lab);
+create index gisaid_sequence_region_exposure_index2  on gisaid_sequence_staging (region_exposure);
+create index gisaid_sequence_region_index2  on gisaid_sequence_staging (region);
+create index gisaid_sequence_sex_index2  on gisaid_sequence_staging (sex);
+create index gisaid_sequence_staging_iso_country_idx  on gisaid_sequence_staging (iso_country);
+create index gisaid_sequence_submitting_lab_index2  on gisaid_sequence_staging (submitting_lab);
+
+
+
+
+create table gisaid_sequence_nextclade_mutation_aa_staging
+(
+  strain text not null
+    references gisaid_sequence_staging(strain) on update cascade on delete cascade,
+  aa_mutation text not null primary key
+);
+create index gisaid_sequence_nextclade_mutation_aa_aa_mutation_index2 on gisaid_sequence_nextclade_mutation_aa_staging(aa_mutation);
+create index gisaid_sequence_nextclade_mutation_aa_strain_index2 on gisaid_sequence_nextclade_mutation_aa_staging(strain);
+
+create table gene
+(
+  gene                   text                not null primary key,
+  reference_aa_sequence  text                not null,
+  start_position         integer             not null,
+  end_position           integer             not null  
+);
+
+
+
+create table pubmed_article 
+(
+  pmid            bigint             not null primary key,
+  date_completed  date,
+  date_revised    date,
+  article_title   text               not null,
+  journal_title   text,
+  abstract        text,
+  language        text
+);
+
+create table pubmed_author
+(
+  id               bigserial  primary key,
+  lastname         text,
+  forename         text,
+  collective_name  text
+);                                          
+
+create table pubmed_article__pubmed_author
+(
+  pmid bigint not null
+    references pubmed_article(pmid) on update cascade on delete cascade,
+  author_id bigint not null
+    references pubmed_author(id) on update cascade on delete cascade,
+  primary key(pmid, author_id)
+);     
+
+
+create table rxiv_article
+(
+  doi        text                not null primary key,
+  version    integer,
+  title      text,
+  date       date,
+  type       text,
+  category   text,
+  abstract   text,
+  license    text,
+  server     text,
+  jatsxml    text,
+  published  text
+);                  
+create table rxiv_author
+(
+  id serial primary key,
+  name text
+);
+
+create table rxiv_article__rxiv_author
+(
+  doi        text                not null
+    references rxiv_article(doi) on update cascade on delete cascade,
+  author_id  integer             not null
+    references rxiv_author(id) on update cascade on delete cascade,
+  position   integer             not null,
+  primary key (doi, author_id, "position")
+);                              
+                                            
+create table spectrum_account (
+  username       text             not null primary key,
+  password_hash  text             not null,
+  full_name      text  
+);                       
+
+create table spectrum_api_cache_sample (
+  id                serial primary key,
+  fields            text                         not null,
+  private_version   boolean                      not null,
+  region            text                         not null,
+  country           text                         not null,
+  mutations         text                         not null,
+  match_percentage  double precision             not null,
+  pangolin_lineage  text                         not null,
+  data_type         text                         not null,
+  date_from         date                         not null,
+  date_to           date                         not null,
+  cache             text                         not null
+); 
+create unique index spectrum_api_cache_sample_fields_private_version_region_cou_idx on spectrum_api_cache_sample (fields, private_version, region, country, mutations, match_percentage, pangolin_lineage, data_type, date_from, date_to);             
+
+create table spectrum_api_usage_sample (
+  id                serial primary key,
+  isoyear           integer                      not null,
+  isoweek           integer                      not null,
+  usage_count       integer                      not null,
+  fields            text                         not null,
+  private_version   boolean                      not null,
+  region            text                         not null,
+  country           text                         not null,
+  mutations         text                         not null,
+  match_percentage  double precision             not null,
+  data_type         text                         not null,
+  date_from         date                         not null,
+  date_to           date                         not null,
+  pangolin_lineage  text,
+  unique (isoyear, isoweek, fields, private_version, region, country, mutations, match_percentage, pangolin_lineage, data_type, date_from, date_to)
+); 
+
+create table spectrum_region (
+  name text not null primary key,
+  url_component text not null unique
+);   
+
+create table spectrum_country (
+  iso_code               text             not null primary key
+    references country(iso_code),
+  name                   text             not null unique,
+  region                 text             not null unique
+    references spectrum_region(name),
+  url_component          text             not null,
+  fiv_resource_category  text
+);             
+
+create table spectrum_country_mapping (
+  cov_spectrum_country  text,
+  cov_spectrum_region   text,
+  gisaid_country        text,
+  owid_country          text
+);                           
+
+create table spectrum_new_interesting_variant (
+  genbank_accession    text,
+  id                   serial primary key,
+  insertion_timestamp  timestamp without time zone             not null,
+  country              text                                    not null
+    references spectrum_country(name),
+  data_type            jsonb,
+  result               text                                    not null
+);   
+create index spectrum_new_interesting_variant_country_idx on spectrum_new_interesting_variant (country);
+create index spectrum_new_interesting_variant_data_type_idx on spectrum_new_interesting_variant (data_type);
+create index spectrum_new_interesting_variant_insertion_timestamp_idx on spectrum_new_interesting_variant (insertion_timestamp);
+
+create table spectrum_owid_global_cases_raw (
+  iso_country             text                         not null,
+  region                  text                         not null,
+  country                 text                         not null,
+  date                    date                         not null,
+  new_cases_per_million   double precision,
+  new_deaths_per_million  double precision,
+  new_cases               integer,
+  new_deaths              integer,
+  primary key (country, date)
+);                     
+
+create index spectrum_owid_global_cases_raw_country_idx on spectrum_owid_global_cases_raw (country);
+create index spectrum_owid_global_cases_raw_region_idx on spectrum_owid_global_cases_raw (region);
+
+create table spectrum_pangolin_lineage_recent_metrics (
+  id                       serial primary key,
+  insertion_timestamp      timestamp without time zone             not null,
+  pangolin_lineage         text                                    not null,
+  region                   text,
+  country                  text,
+  fitness_advantage        double precision                        not null,
+  fitness_advantage_lower  double precision                        not null,
+  fitness_advantage_upper  double precision                        not null
+);           
+                               
+
+create table spectrum_usage_browser (
+  id             bigserial primary key,
+  date           date                not null,
+  browser_type   text,
+  browser_exact  text,
+  visitors       integer             not null,
+  bytes          bigint              not null,
+  hits           integer             not null
+);                             
+
+create table spectrum_usage_geo (
+  id        bigserial primary key,
+  date      date                not null,
+  country   text,
+  division  text,
+  city      text,
+  visitors  integer             not null,
+  hits      integer             not null,
+  bytes     bigint              not null
+);                      
+
+ create table spectrum_usage_hour (
+  id        bigserial  primary key,
+  date      date                not null,
+  hour      integer,
+  visitors  integer             not null,
+  hits      integer             not null,
+  bytes     bigint              not null
+ );     
+
+ create table spectrum_usage_os (
+  id        bigserial primary key,
+  date      date                not null,
+  os_type   text,
+  os_exact  text,
+  visitors  integer             not null,
+  hits      integer             not null,
+  bytes     bigint              not null
+ );    
+
+ create table spectrum_usage_referrer (
+  id              bigserial primary key,
+  date            date                not null,
+  referring_site  text,
+  visitors        integer             not null,
+  hits            integer             not null,
+  bytes           bigint              not null
+ );              
+
+create table spectrum_waste_water_result (
+  variant_name  text              not null,
+  location      text              not null,
+  data          jsonb             not null,
+  primary key (variant_name, location)
+);     
+
+create table spectrum_waste_water_variant (
+  variant_name text not null primary key,
+  description text not null
+);                                              
