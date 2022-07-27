@@ -94,7 +94,7 @@ def import_sequences(
 
     for sample_name in found_sample_names:
 
-        sample_number = sample_name.split("_")[0]
+        sample_number, *rest = sample_name.split("_")
         cursor.execute(
             f"""
             SELECT test_id
@@ -114,25 +114,32 @@ def import_sequences(
 
         test_id = values[0]
 
-        cursor.execute(
-            """
-            SELECT sequencing_plate, sequencing_plate_well
-            FROM test_plate_mapping
-            JOIN test_metadata
-            ON test_plate_mapping.test_id = test_metadata.test_id
-            WHERE test_metadata.test_id=%s;""",
-            (test_id,),
-        )
-
-        rows = cursor.fetchall()
-        if not rows:
-            print(
-                "test_plate_mapping inconsistency: did not find entry for"
-                f" test_id={test_id}"
-            )
-            plate, well = None, None
+        if len(rest) == 4:
+            plate, well, type_, opt = rest
         else:
-            plate, well = rows[0]
+            print(
+                f"filename {sample_name} did not follow ETHID_PLATE_WELL_TYPE_OPT"
+                " convetion."
+            )
+            cursor.execute(
+                """
+                SELECT sequencing_plate, sequencing_plate_well
+                FROM test_plate_mapping
+                JOIN test_metadata
+                ON test_plate_mapping.test_id = test_metadata.test_id
+                WHERE test_metadata.test_id=%s;""",
+                (test_id,),
+            )
+
+            rows = cursor.fetchall()
+            if not rows:
+                print(
+                    "test_plate_mapping inconsistency: did not find entry for"
+                    f" test_id={test_id}"
+                )
+                plate, well = None, None
+            else:
+                plate, well = rows[0]
 
         i += 1
         if batch is None:
@@ -156,7 +163,7 @@ def import_sequences(
                 f"INSERT INTO {DEST_TABLE}"
                 "   (sample_name, seq_aligned, seq_unaligned, sequencing_batch, "
                 "    sequencing_plate, sequencing_plate_well, ethid, insert_date) "
-                #"    sequencing_center)"
+                # "    sequencing_center)"
                 " VALUES(%s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     sample_name,
@@ -167,13 +174,13 @@ def import_sequences(
                     well,
                     ethid,
                     datetime.now()
-                    #sequencing_center
+                    # sequencing_center
                 ),
             )
 
             cursor.execute(
                 """
-            SELECT S.sequencing_center 
+            SELECT S.sequencing_center
             FROM sequencing_plate as S
             JOIN consensus_sequence as C
             ON   S.sequencing_plate_name = C.sequencing_plate
