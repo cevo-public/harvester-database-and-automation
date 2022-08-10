@@ -176,7 +176,7 @@ class DatabaseConnector(object):
             on conflict do nothing;\
         "
         self.exec_db_cmd(insertSql)
-
+    '''
     def add_to_sequencing_plate(self, sample_data, col_dict):
         from datetime import date
         sequencing_plate_name = sample_data[col_dict["plate"]]
@@ -188,25 +188,24 @@ class DatabaseConnector(object):
             values ('{sequencing_plate_name}', '{sequencing_center}', '{sequencing_date}', '{comment}')\
             on conflict do nothing;"
         self.exec_db_cmd(insertSql)
+    '''
 
     def add_to_test_plate_mapping(self, sample_data, col_dict, lab_name):
         test_id = lab_name + '/' + sample_data['ethid']
         extraction_plate = sample_data[col_dict["seq_center"]] + '/' + sample_data[col_dict["plate"]]
         extraction_plate_well = sample_data[col_dict["well"]]
         extraction_e_gene_ct = sample_data[col_dict["ct"]]
-        sequencing_plate =  sample_data[col_dict["plate"]]
-        sequencing_plate_well = sample_data[col_dict["well"]]
 
         if extraction_e_gene_ct == '-' or extraction_e_gene_ct.isspace() or not extraction_e_gene_ct:
             insertSql = f"\
                 insert into test_plate_mapping (test_id, extraction_plate, extraction_plate_well, extraction_e_gene_ct, sequencing_plate, sequencing_plate_well, sample_type)\
-                values ('{test_id}', '{extraction_plate}', '{extraction_plate_well}', null, '{sequencing_plate}', '{sequencing_plate_well}', 'clinical')\
+                values ('{test_id}', '{extraction_plate}', '{extraction_plate_well}', null, null, null, 'clinical')\
                 on conflict do nothing;\
             "   
         else:         
             insertSql = f"\
                 insert into test_plate_mapping (test_id, extraction_plate, extraction_plate_well, extraction_e_gene_ct, sequencing_plate, sequencing_plate_well, sample_type)\
-                values ('{test_id}', '{extraction_plate}', '{extraction_plate_well}', '{int(float(extraction_e_gene_ct))}', '{sequencing_plate}', '{sequencing_plate_well}', 'clinical')\
+                values ('{test_id}', '{extraction_plate}', '{extraction_plate_well}', '{int(float(extraction_e_gene_ct))}', null, null, 'clinical')\
                 on conflict do nothing;\
             "
         self.exec_db_cmd(insertSql)
@@ -301,7 +300,6 @@ class DatabaseConnector(object):
                 sample_data['ethid'] = ethid
                 self.add_to_test_metadata(sample_data, col_dict, labname.lower())
                 self.add_to_extraction_plate(sample_data, col_dict)
-                self.add_to_sequencing_plate(sample_data, col_dict)
                 self.add_to_test_plate_mapping(sample_data, col_dict, labname.lower())
                 if labname == 'viollier':
                     self.add_to_viollier_metadata(sample_data)
