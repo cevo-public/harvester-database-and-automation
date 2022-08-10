@@ -138,7 +138,7 @@ class DatabaseConnector(object):
         existingids = self.exec_db_cmd(selectSql, getdata=True)
         if existingids:
             if not existingids[0][0] == None:
-                raise SampleNumberExistingException
+                print(f"Warning: sample number {sample_number} already exists.")
         insertSql = "select MAX(ethid) as maxid from test_metadata;"
         maxid_rows = self.exec_db_cmd(insertSql, getdata=True)
         
@@ -309,11 +309,7 @@ class DatabaseConnector(object):
                     self.add_to_teamw_metadata(sample_data)
                 elif labname == 'eoc':
                     self.add_to_eoc_metadata(sample_data)
-
             return True
-        except SampleNumberExistingException as e:
-            print(f"Error - Sample number already exists: {sample_data['Sample number']}")
-            return False
         except Exception as e:
             print(f'Error - Cannot import sample {sample_data["Sample number"]}: {e}')
             return False

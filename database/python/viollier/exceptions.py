@@ -12,5 +12,3 @@ class DataBaseConnectionException(Exception):
 	pass
 class DataMissingException(Exception):
     pass
-class SampleNumberExistingException(Exception):
-    pass
