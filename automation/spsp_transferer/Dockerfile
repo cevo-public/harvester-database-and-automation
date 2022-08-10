@@ -54,4 +54,4 @@ COPY transfer.sh /app/transfer.sh
 RUN chmod +x /app/transfer.sh
 
 # Run script to generate and submit submission files
-ENTRYPOINT ["java", "-Xmx12g", "-jar", "/app/vineyard-1.0-SNAPSHOT.jar", "SpspExporter", "/mnt/pangolin/sampleset", "/app/outdir"]
+ENTRYPOINT ["java", "-Xmx12g", "-jar", "/app/vineyard-1.0-SNAPSHOT.jar", "SpspExporter", "/mnt/pangolin/sampleset", "/app/outdir", "/mnt/pangolin/working"]

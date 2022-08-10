@@ -104,12 +104,13 @@ public class BatchProcessingWorker {
             }
 
             // Fetch the submitter information for all APPEND sequences
-            for (Sequence sequence : batch.getSequences()) {
-                if (sequence.getImportMode() == ImportMode.APPEND) {
-                    submitterInformationFetcher.fetchSubmitterInformation(sequence.getGisaidEpiIsl())
-                            .ifPresent(sequence::setSubmitterInformation);
-                }
-            }
+            // Due to new rate limitation, we don't fetch the submitter information anymore.
+//            for (Sequence sequence : batch.getSequences()) {
+//                if (sequence.getImportMode() == ImportMode.APPEND) {
+//                    submitterInformationFetcher.fetchSubmitterInformation(sequence.getGisaidEpiIsl())
+//                            .ifPresent(sequence::setSubmitterInformation);
+//                }
+//            }
 
             // Determine the sequences that need to be processed by mafft and Nextclade
             List<Sequence> sequencePreprocessingNeeded = batch.getSequences().stream()

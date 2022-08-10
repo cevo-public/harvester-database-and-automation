@@ -29,25 +29,25 @@ generate_alignment <- function(db_connection, sample_names, seq_outfile,
     select(!!sym(sample_name_col), !!sym(seq_col), !!sym(key_col), !!sym(plate_col), !!sym(well_col))
   seq_tbl <- seq_query %>% collect()
 
-  merging_table <- dplyr::tbl(db_connection, merging_table_name) %>%
-    select(!!sym(main_key), !!sym(plate_col), !!sym(well_col)) %>% collect()
-
-  #seq_tbl <- merge(x = seq_tbl, y = merging_table, all.x = T, all.y = F)
-  seq_tbl <- left_join(x=seq_tbl, y=merging_table, by=c(plate_col, well_col), na_matches="never")
-
-  keys <- unlist(seq_tbl[[main_key]])
-  metadata_query <- dplyr::tbl(db_connection, metadata_table_name) %>%
-    filter(!!sym(main_key) %in% keys) %>%
-    select(!!sym(main_key), !!sym(date_col))
-  metadata_tbl <- metadata_query %>% collect()
-  if (sample_name_col == main_key) {
-    selected_cols <- sample_name_col
-  } else {
-    selected_cols <- c(sample_name_col, main_key)
-  }
-  metadata_tbl <- merge(x = metadata_tbl, y = seq_tbl[, selected_cols], all.y = T) %>%
-    mutate(virus = "ncov", region = "dummy_region", date_submitted = as.Date(!!sym(date_col)) + 14) %>%
-    rename(name = !!sym(sample_name_col), date = !!sym(date_col))
+#  merging_table <- dplyr::tbl(db_connection, merging_table_name) %>%
+#    select(!!sym(main_key), !!sym(plate_col), !!sym(well_col)) %>% collect()
+#
+#  #seq_tbl <- merge(x = seq_tbl, y = merging_table, all.x = T, all.y = F)
+#  seq_tbl <- left_join(x=seq_tbl, y=merging_table, by=c(plate_col, well_col), na_matches="never")
+#
+#  keys <- unlist(seq_tbl[[main_key]])
+#  metadata_query <- dplyr::tbl(db_connection, metadata_table_name) %>%
+#    filter(!!sym(main_key) %in% keys) %>%
+#    select(!!sym(main_key), !!sym(date_col))
+#  metadata_tbl <- metadata_query %>% collect()
+#  if (sample_name_col == main_key) {
+#    selected_cols <- sample_name_col
+#  } else {
+#    selected_cols <- c(sample_name_col, main_key)
+#  }
+#  metadata_tbl <- merge(x = metadata_tbl, y = seq_tbl[, selected_cols], all.y = T) %>%
+#    mutate(virus = "ncov", region = "dummy_region", date_submitted = as.Date(!!sym(date_col)) + 14) %>%
+#    rename(name = !!sym(sample_name_col), date = !!sym(date_col))
   
   seq_outfile_con <- file(seq_outfile, open = "a")
   seq_tbl <- seq_tbl %>% mutate("header" = paste0(">", !!sym(sample_name_col)))
@@ -97,7 +97,7 @@ import_diagnostic <- function(db_connection, outdir, tbl_name_meta) {
   colnames(diagnostic_transformed)[colnames(diagnostic_transformed) == "strain"] <- "sample_name"
   diagnostic_transformed$gaps[diagnostic_transformed$gaps == ''] <- NA  # not sure why, but sometimes empty gaps field read as NA and sometimes as ''
   diagnostic_transformed$clusters[diagnostic_transformed$clusters == ''] <- NA  # so that we don't end up with both blanks and nulls in the data
-  diagnostic_transformed$sample_name <- as.character(diagnostic_transformed$sample_name) #If sample names are all numbers, the column is automatically cast as "int", breaking the SQL queries
+  diagnostic_transformed$sample_name <- as.character(diagnostic_transformed$sample_name) #if all samples names are numeric, this column is automatically set as numeric. This is incompatible with the structure of the table "consensus_sequence"
   # Import data
   update_table_internal(
     table_name = tbl_name_meta, new_table = diagnostic_transformed,
@@ -149,11 +149,11 @@ import_sequence_diagnostic <- function (
   if (update_all_seqs) {
     query <- dplyr::tbl(db_connection, "consensus_sequence") %>%
       filter(!is.null(seq_aligned)) %>%
-      select(sample_name)
+      select(sample_name) %>% collect()
   } else if (!is.null(update_batches)) {
     query <- dplyr::tbl(db_connection, "consensus_sequence") %>%
       filter(sequencing_batch %in% update_batches) %>%
-      select(sample_name)
+      select(sample_name) %>% collect()
   } else {
     query <- dplyr::tbl(db_connection, "consensus_sequence") %>%
       filter(!is.null(seq_aligned)) %>%
@@ -163,7 +163,7 @@ import_sequence_diagnostic <- function (
       select(sample_name) %>% collect()
     query <- query$sample_name[query$sample_name %in% query_meta$sample_name]
   }
-  sample_names_to_diagnose <- query
+  sample_names_to_diagnose <- as.data.frame(query)[,1]
 
   # Because there may be many sequences, run diagnostic on chunks of chunk_size
   i <- 0
