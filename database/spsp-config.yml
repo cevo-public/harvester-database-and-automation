@@ -1,9 +1,16 @@
 authors:
-  gfb: Christian Beisel, Sarah Nadeau, Chaoran Chen, Louis du Plessis, Ivan Topolsky, Kim Philipp Jablonski, Lara Fuhrmann, David Dreifuss, Pelin Icer, Tobias Schär, Ina Nissen, Natascha Santacroce, Rebecca Denes, Mirjam Feldkamp, Elodie Burcklen, Christiane Beckmann, Matteo Carrara, Shuqing Yu, Franziska Singer, Andrea Patrizia Salzmann, Sebastian Kurscheid, Henriette Kurth, Maurice Redondo, Olivier Kobel, Christoph Noppen, Niko Beerenwinkel, Tanja Stadler
-  fgcz_viollier: Chaoran Chen, Sarah Nadeau, Louis du Plessis, Catharine Aquino Fournier, Andrea Patrizia Salzmann, Sebastian Kurscheid, Henriette Kurth, Ivan Topolsky, Kim Philipp Jablonski, Lara Fuhrmann, David Dreifuss, Pelin Icer, Daniel Ehrsam, Isabel Stürmer, Andreia Cabral de Gouvea, Maria Domenica Moccia, Simon Grüter, Timothy Sykes, Lennart Opitz, Hai Bui, Christian Urban, Matteo Carrara, Shuqing Yu, Franziska Singer, Griffin White, Laura Neff, Doris Popovic, Andrea Patrignani, Jay Tracy, Ralph Schlapbach, Christiane Beckmann, Maurice Redondo, Olivier Kobel, Christoph Noppen, Niko Beerenwinkel, Tanja Stadler
-  h2030: Chaoran Chen, Sarah Nadeau, Louis du Plessis, Ivan Topolsky, Keith Harshman, Ioannis Xenarios, Cedric Howald, Lorenzo Cerutti, Henri Pegeot, Melyssa Elies, Anthony Blin, Deborah Penet, Jerome Thomas,  Arnaud Hungler, Ilya Kolpakov, Arkadiy Shevrikuko, Katrin Männik, Kim Philipp Jablonski, Lara Fuhrmann, David Dreifuss, Pelin Icer, Christiane Beckmann, Matteo Carrara, Shuqing Yu, Franziska Singer, Andrea Patrizia Salzmann, Sebastian Kurscheid, Henriette Kurth, Maurice Redondo, Olivier Kobel, Christoph Noppen, Niko Beerenwinkel, Tanja Stadler
-  viollier: Andrea Patrizia Salzmann, Sebastian Kurscheid, Henriette Kurth, Christiane Beckmann, Ivan Topolsky, Chaoran Chen, Sarah Nadeau, Louis du Plessis, Kim Philipp Jablonski, Lara Fuhrmann, David Dreifuss, Pelin Icer, Matteo Carrara, Shuqing Yu, Franziska Singer, Niko Beerenwinkel, Christoph Noppen, Olivier Kobel, Maurice Redondo, Tanja Stadler
-  fgcz_teamw: Ivan Topolsky, Sarah Nadeau, Chaoran Chen, Louis du Plessis, Rebekka Pohl, Monika Bucher, Andreas Lindauer, Catharine Aquino Fournier, Daniel Ehrsam, Isabel Stürmer, Andreia Cabral de Gouvea, Maria Domenica Moccia, Simon Grüter, Timothy Sykes, Lennart Opitz, Hai Bui, Christian Urban, Matteo Carrara, Shuqing Yu, Franziska Singer, Griffin White, Laura Neff, Doris Popovic, Andrea Patrignani, Jay Tracy, Ralph Schlapbach, Ivan Topolsky, Kim Philipp Jablonski, Lara Fuhrmann, David Dreifuss, Pelin Icer, Niko Beerenwinkel, Tanja Stadler
+  eoc: Spina Valeria Romina, Gloria Gaudio, Gladys Martinetti Lucchini
+  ethz: Chaoran Chen, Sarah Nadeau, Louis du Plessis, Ivan Topolsky, Kim Philipp Jablonski, Lara Fuhrmann, David Dreifuss, Pelin Burcak Icer, Matteo Carrara, Shuqing Yu, Franziska Singer, Niko Beerenwinkel, Tanja Stadler
+  fgcz: Catharine Aquino Fournier, Daniel Ehrsam, Isabel Stürmer, Andreia Cabral de Gouvea, Maria Domenica Moccia, Simon Grüter, Timothy Sykes, Lennart Opitz, Hai Bui, Christian Urban, Griffin White, Laura Neff, Doris Popovic, Andrea Patrignani, Jay Tracy, Ralph Schlapbach
+  gfb: Christian Beisel, Tobias Schär, Ina Nissen, Natascha Santacroce, Rebecca Denes, Mirjam Feldkamp, Elodie Burcklen
+  imv: Verena Kufner, Maryam Zaheri, Stefan Schmutz, Kevin Steiner, Riccarda Capaul, Guido Bloemberg, Michael Huber, Alexandra Trkola
+  teamw: Rebekka Pohl, Monika Bucher, Andreas Lindauer, Andreas Grutsch
+  viollier: Andrea Patrizia Salzmann, Henriette Kurth, Christiane Beckmann, Maurice Redondo, Olivier Kobel, Christoph Noppen, Sebastian Kurscheid
+involved_labs:
+  viollier
+  eoc
+  imv
+  teamw
 mandatory_metadata_columns:
   orig_fasta_name
   strain_name
