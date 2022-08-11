@@ -273,14 +273,13 @@ report_controls_with_ethid <- function(all_db_seqs_annotated, args) {
   sample_name <- all_db_seqs_annotated$sample_name
   print(sample_name)
   controls <- grep("control", sample_name, ignore.case = TRUE)
-  print(controls)
+  #print(controls)
   if(length(controls) > 0) {
-    print("in")
     print(notify.warn(
       msg = paste0("Removing ", length(controls), " control samples with ethid: ", paste(controls, collapse=",")),
       fcn = paste0(args$script_name, "::", "report_controls_with_ethid")))
     non_ctrls <- grep("control", sample_name, ignore.case = TRUE, invert = TRUE)
-    print(paste("return"))
+    #print(paste("return"))
     return(all_db_seqs_annotated[non_ctrls,])
   }
 }
@@ -418,7 +417,7 @@ get_sample_metadata <- function(db_connection, args, samples, raw_data_file_name
 
   qcd_metadata <- qc_sample_metadata(metadata = metadata_w_canton, args)
   spsp_formatted_metadata <- format_metadata_for_spsp(metadata = qcd_metadata, args)
-  added_metadata <- insert_additional_metadata(spsp_formatted_metadata, args)
+  added_metadata <- insert_additional_metadata(spsp_formatted_metadata, args, db_connection)
   metadata <- check_mandatory_columns(metadata = added_metadata, args)
   return(metadata)
 }
@@ -493,13 +492,13 @@ for(i in 1:nrow(metadata)){
   if(metadata$covv_orig_lab[i] == "labor team w AG") { metadata$authors[i] = seq_authors$teamw }
   if(metadata$covv_orig_lab[i] == "Viollier AG") { metadata$authors[i] = seq_authors$viollier }
 
-    if(metadata$sequencing_center[i] == "viollier") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$viollier, sep=", ") }
-    if(metadata$sequencing_center[i] == "gfb") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$gfb, sep=", ") }
-    if(metadata$sequencing_center[i] == "h2030") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$h2030, sep=", ") }
-    if(metadata$sequencing_center[i] == "fgcz") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$fgcz, sep=", ") }
-    metadata$authors[i] = paste(metadata$authors[i], seq_authors$ethz, sep=", ")
-  }
-
+  if(metadata$sequencing_center[i] == "viollier") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$viollier, sep=", ") }
+  if(metadata$sequencing_center[i] == "gfb") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$gfb, sep=", ") }
+  if(metadata$sequencing_center[i] == "h2030") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$h2030, sep=", ") }
+  if(metadata$sequencing_center[i] == "fgcz") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$fgcz, sep=", ") }
+  metadata$authors[i] = paste(metadata$authors[i], seq_authors$ethz, sep=", ")
+ }
+  
 #  myauthors <- metadata %>%
 #    summarise(
 #      rep_authors = seq_authors$ethz,
@@ -595,7 +594,7 @@ read_seq_authors <- function(args) {
 }
 
 # Add the information that labs send to us manually
-insert_additional_metadata <- function(metadata, args){
+insert_additional_metadata <- function(metadata, args, db_connection){
   involved_labs <- strsplit(x = read_yaml(file = args$config)[["involved_labs"]], split = " ")[[1]]
   labs_meta <- list()
   ethids <- unlist(lapply(strsplit(metadata$reporting_lab_order_id, "_"), function(x)x[1]))
@@ -723,10 +722,10 @@ test_frameshift_table <- function(mysample, args, db_connection) {
     select(sample_name, sequencing_batch) %>% collect()
   
   print(log.info(
-    msg = paste0(args$workingdir, "/samples/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv"),
+    msg = paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv"),
     fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
 
-  if (!(file.exists(paste0(args$workingdir, "/samples/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv")))) {
+  if (!(file.exists(paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv")))) {
     return(mysample)
   } else{
     return(NULL)
