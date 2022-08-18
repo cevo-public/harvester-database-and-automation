@@ -5,7 +5,7 @@ set -eu
 IMAGE_NAME=registry.ethz.ch/sars_cov_2/harvester-database-and-automation
 
 component=$1
-suffix=_dev
+suffix=-${CI_COMMIT_BRANCH}
 
 echo build $component with suffix $suffix
 echo .
