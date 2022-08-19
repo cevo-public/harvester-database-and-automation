@@ -67,7 +67,7 @@ out <- tryCatch(
   BiocManager::install("Biostrings")
   install.packages("sys")
 },
-  error=install_on_error_or_warning,
+  error=install_on_error_or_warning
 )
 
 
@@ -86,7 +86,7 @@ if (length(args) == 0 | args[1] == "install") {
           }
 
         },
-          error=install_on_error_or_warning,
+          error=install_on_error_or_warning
         )
 } else if (args[1] == "check") {
         result <- T
@@ -96,7 +96,7 @@ if (length(args) == 0 | args[1] == "install") {
                 library(p, character.only=TRUE)
           }
         },
-          error=function(err){print(err); quit(status=1)},
+          error=function(err){print(err); quit(status=1)}
         )
     quit(status=0);
 }
