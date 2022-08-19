@@ -1,33 +1,37 @@
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 
-# Update packages
-RUN apt-get update  \
-&& apt-get -y install \
-    cifs-utils \
-    python3 \
-    python3-pip \
-    r-base \
-    r-base-dev \
-    libcurl4-openssl-dev \
-    libxml2-dev \
-    libssl-dev \
-    libpq-dev \
-    libudunits2-dev \
-    libgdal-dev \
-    git \
-    curl \
-    wget \
-    nodejs \
-    owncloud-client-cmd \
-    netcat \
-    gpg \
-    openssh-client \
-    npm
-
+RUN \
+    apt-get update \
+    && apt-get install -y --no-install-recommends wget gnupg ca-certificates \
+    && wget -nv --no-check-certificate https://download.owncloud.com/desktop/ownCloud/stable/latest/linux/Debian_11/Release.key -O - | apt-key add - \
+    && echo 'deb https://download.owncloud.com/desktop/ownCloud/stable/latest/linux/Debian_11/ /' | tee -a /etc/apt/sources.list.d/owncloud.list \
+    && apt-get update \
+    && apt-get -y --no-install-recommends install \
+        cifs-utils \
+        python3 \
+        python3-pip \
+        r-base \
+        r-base-dev \
+        libcurl4-openssl-dev \
+        libxml2-dev \
+        libssl-dev \
+        libpq-dev \
+        libudunits2-dev \
+        libgdal-dev \
+        git \
+        curl \
+        wget \
+        nodejs \
+        netcat \
+        gpg \
+        openssh-client \
+        npm \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY database/ pangolin/ transfer-tool/ /app/
 
-RUN Rscript /app/R/install_packages.R
-RUN pip3 install -r /app/python/requirements.txt
+RUN Rscript /app/R/install_packages.R \
+    && pip3 install -r /app/python/requirements.txt
 
-RUN apt-get install -y npm
+RUN apt-get install -y --no-install-recommends  owncloud-client \
+    && rm -rf /var/lib/apt/lists/*
