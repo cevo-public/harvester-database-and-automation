@@ -24,6 +24,7 @@ main <- function(args) {
   db_output <- get_samples_to_release(db_connection, args)
   if (length(db_output$samples) > 0) {
     config <- read_yaml(file = args$config)
+    #raw_data_file_names <- NULL
     raw_data_file_names <- upload_raw_data_files(db_output$samples, date, config$raw_data_upload)
     metadata <- get_sample_metadata(db_connection, args, db_output$samples, raw_data_file_names)
     frameshifts_tbl <- get_frameshift_diagnostics(db_connection, metadata, args)
@@ -519,7 +520,7 @@ for(i in 1:nrow(metadata)){
     summarise(
       orig_fasta_name = paste0(sample_name, ".fasta.gz"),
       strain_name = case_when(
-        lab_short_name == "imv" ~ "",#paste("hCoV-19", "Switzerland", paste(canton, "UZH-IMV", "#T#$^%$^$#^$^#%^%^$", sep = "-"),lubridate::year(order_date), sep="/"),
+        lab_short_name == "imv" ~ paste("hCoV-19", "Switzerland", paste(canton, "UZH-IMV", "PLACEHOLDER", sep = "-"),lubridate::year(order_date), sep="/"),
         lab_short_name == "eoc" ~ paste("hCoV-19", "Switzerland", paste(canton, "EOC", ethid, sep="-"),lubridate::year(order_date), sep="/"),
         lab_short_name == "viollier" ~ paste("hCoV-19", "Switzerland", paste(canton, "ETHZ", ethid, sep = "-"),lubridate::year(order_date), sep="/"),
         lab_short_name == "teamw" ~ paste("hCoV-19", "Switzerland", paste(canton, "ETHZ", ethid, sep = "-"),lubridate::year(order_date), sep="/")
@@ -620,11 +621,10 @@ insert_additional_metadata <- function(metadata, args, db_connection){
               new_strain <- metadata$strain_name[meta_row_index]
               new_strain <- unlist(strsplit(new_strain, "/"))
               tmp_strain <- unlist(strsplit(new_strain[3], "-"))
-              tmp_strain[3] <- labs_meta[[i]][k,m]
+              tmp_strain[4] <- labs_meta[[i]][k,m]
               tmp_strain <- paste0(tmp_strain, collapse = "-")
               new_strain <- paste(new_strain[1], new_strain[2], tmp_strain, new_strain[4], sep = "/")
               metadata$strain_name[meta_row_index] <- new_strain
-              if(new_strain == ""){message(i)}
             }else{
               meta_col_index <- which(colnames(metadata) %in% colnames(labs_meta[[i]])[m])
               metadata[meta_row_index, meta_col_index] <- labs_meta[[i]][k,m]
