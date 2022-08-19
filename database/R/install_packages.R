@@ -72,6 +72,8 @@ out <- tryCatch(
 )
 
 
+args = commandArgs(trailingOnly=TRUE)
+
 if (length(args) == 0 | args[1] == "install") {
 
         out <- tryCatch(
