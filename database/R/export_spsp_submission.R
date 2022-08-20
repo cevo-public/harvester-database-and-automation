@@ -546,7 +546,7 @@ test_frameshift_table <- function(mysample, args, db_connection) {
   
   print(log.info(
     msg = paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv"),
-#    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
+    fcn = paste0(args$script_name, "::", "get_frameshift_diagnostics")))
 
   if (!(file.exists(paste0(args$workingdir, "/", mysample, "/", sample_batch$sequencing_batch, "/references/frameshift_deletions_check.tsv")))) {
     return(mysample)

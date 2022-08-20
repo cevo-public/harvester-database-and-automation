@@ -552,6 +552,7 @@ create table viollier_test (
   canton text,
   pcr_code text,
   is_positive boolean not null,
+  purpose text,
   sequenced_by_viollier boolean not null default false,
   comment text
 );
@@ -713,6 +714,8 @@ create table bag_dashboard_meldeformular
 	grunderkr_resp_chron boolean,
 	grunderkr_krebs boolean,
 	grunderkr_immunsup boolean,
+	grunderkr_adipos boolean,
+	grunderkr_chron_nier boolean,
 	grunderkr_andere boolean,
 	grunderkr_keine boolean,
 	icu_aufenthalt integer,

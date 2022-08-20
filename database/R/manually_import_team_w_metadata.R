@@ -5,7 +5,7 @@
 
 require(dplyr)
 source("R/utility.R")
-db_connection <- open_database_connection("server", config_file=)
+db_connection <- open_database_connection("server")
 
 # Load team w metadata from the files they send to FGCZ
 metadata_dir <- ""
