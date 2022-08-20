@@ -2,7 +2,7 @@
 set -eu
 
 # Constants
-IMAGE_NAME=registry.ethz.ch/sars_cov_2/harvester-database-and-automation
+IMAGE_NAME=$CI_REGISTRY_IMAGE
 
 component=$1
 suffix=-${CI_COMMIT_BRANCH}
