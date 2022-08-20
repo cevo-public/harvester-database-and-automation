@@ -6,6 +6,7 @@ RUN \
     && wget -nv --no-check-certificate https://download.owncloud.com/desktop/ownCloud/stable/latest/linux/Debian_11/Release.key -O - | apt-key add - \
     && echo 'deb https://download.owncloud.com/desktop/ownCloud/stable/latest/linux/Debian_11/ /' | tee -a /etc/apt/sources.list.d/owncloud.list \
     && apt-get update \
+    && apt-get install -y --no-install-recommends  owncloud-client \
     && apt-get -y --no-install-recommends install \
         cifs-utils \
         python3 \
@@ -32,6 +33,3 @@ COPY database/ pangolin/ transfer-tool/ /app/
 
 RUN Rscript /app/R/install_packages.R \
     && pip3 install -r /app/python/requirements.txt
-
-RUN apt-get install -y --no-install-recommends  owncloud-client \
-    && rm -rf /var/lib/apt/lists/*
