@@ -8,7 +8,6 @@ for component in bag_meldeformular_importer \
     nextclade_importer \
     owid_global_cases_importer \
     pangolin_lineage_importer \
-    spsp_transferer \
     gisaid_api_importer \
     java; do
     echo .
