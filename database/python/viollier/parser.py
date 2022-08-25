@@ -159,7 +159,7 @@ class Parser():
             else: 
                 print(f"Error - unknown sequencing purpose: {x}")
                 raise UnKnownSequencingPurposeException
-                
+
         def calibrate_plate_name(x):
             #upper-case and (A01 -> A1)
             return x[0].upper() + str(int(x[1:]))
@@ -169,6 +169,8 @@ class Parser():
                 if not "60997 wuha20" in df.columns:
                     df["60997 wuha20"] = " "
                 df["purpose"] = df["60997 wuha20"].apply(calibrate_sequencing_purpose)
+                df['is_hosp'] = df['Aufnahmenummer'].apply(lambda x: x and not x.isspace() )
+                df.loc[df['is_hosp'] == True, 'purpose'] = "surveillance_hosp"
             else:
                 df["purpose"] = df["Sequencing purpose"].apply(calibrate_sequencing_purpose)
 
