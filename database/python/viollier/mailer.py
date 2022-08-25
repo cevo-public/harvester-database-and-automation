@@ -104,7 +104,7 @@ class Mailer():
                         "ct": '',
                         "plate_name": html_data_list[0]['plate_name'],
                         "well_position": 'G12',
-                        "ethid__plate__well__type__opt": f"ETHID__{html_data_list[0]['plate_name']}__G12__positiveControl__opt",
+                        "ethid--plate--well--type--opt": f"ETHID--{html_data_list[0]['plate_name']}--G12--positiveControl--opt",
                         "sample_name": '',
                     }
                     html_data_list.append(new_item)
@@ -115,7 +115,7 @@ class Mailer():
                         "ct": '',
                         "plate_name": html_data_list[0]['plate_name'],
                         "well_position": 'H12',
-                        "ethid__plate__well__type__opt": f"ETHID__{html_data_list[0]['plate_name']}__H12__negativeControl__opt",
+                        "ethid--plate--well--type--opt": f"ETHID--{html_data_list[0]['plate_name']}--H12--negativeControl--opt",
                         "sample_name": '',
                     }
                     html_data_list.append(new_item)
@@ -126,7 +126,7 @@ class Mailer():
                     "ct": '',
                     "plate_name": '',
                     "well_position": '',
-                    "ethid__plate__well__type__opt": f"ETHID__PLATE__WELL__positiveControl__opt",
+                    "ethid--plate--well--type--opt": f"ETHID--PLATE--WELL--positiveControl--opt",
                     "sample_name": '',
                 }
                 html_data_list.append(new_item)
@@ -136,7 +136,7 @@ class Mailer():
                     "ct": '',
                     "plate_name": '',
                     "well_position": '',
-                    "ethid__plate__well__type__opt": f"ETHID__PLATE__WELL__negativeControl__opt",
+                    "ethid--plate--well--type--opt": f"ETHID--PLATE--WELL--negativeControl--opt",
                     "sample_name": '',
                 }
                 html_data_list.append(new_item)
@@ -165,7 +165,7 @@ class Mailer():
                     "ct": sample_data["CT Wert"],
                     "plate_name": sample_data["PlateID"],
                     "well_position": sample_data["DeepWellLocation"],
-                    "ethid__plate__well__type__opt": f"{sample_data['ethid']}__{PlateID}__{wellID}__{mytype}__opt",
+                    "ethid--plate--well--type--opt": f"{sample_data['ethid']}--{PlateID}--{wellID}--{mytype}--opt",
                     "sample_name": sample_data["Sample number"],
                 }
                 html_data_dict['data'].append(new_item)
