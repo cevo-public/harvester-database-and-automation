@@ -24,7 +24,6 @@ main <- function(args) {
   db_output <- get_samples_to_release(db_connection, args)
   if (length(db_output$samples) > 0) {
     config <- read_yaml(file = args$config)
-    #raw_data_file_names <- NULL
     raw_data_file_names <- upload_raw_data_files(db_output$samples, date, config$raw_data_upload)
     metadata <- get_sample_metadata(db_connection, args, db_output$samples, raw_data_file_names)
     frameshifts_tbl <- get_frameshift_diagnostics(db_connection, metadata, args)
@@ -126,10 +125,6 @@ get_samples_to_release <- function(db_connection, args) {
     select(sample_name, release_decision) %>%
     collect()
   all_db_seqs <- left_join(x = all_db_seqs, y = all_db_seqs_notes, by = "sample_name")
-#  all_plates_mapping <- dplyr::tbl(db_connection, "test_plate_mapping") %>%
-#    select(test_id, sequencing_plate, sequencing_plate_well) %>%
-#    collect()
-#  all_db_seqs <- left_join(x = all_db_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"), na_matches="never")
 
   print(log.info(
     msg = "Checking if batches are fully loaded into database.",
@@ -185,7 +180,6 @@ get_samples_to_release <- function(db_connection, args) {
             sequencing_batch %in% incomplete_batches ~ "data from batch not completely loaded into database")) %>%
     ungroup()
 
-  #TODO: check if after mutating you can move on using the new fail_reason and warning reason
   fail_reason_summary <- summarize_fail_reasons(all_db_seqs_annotated)
   report_suspicious_batches(fail_reason_summary, args)
   report_null_ethids(all_db_seqs_annotated, args)
@@ -272,7 +266,7 @@ report_null_ethids <- function(all_db_seqs_annotated, args) {
 report_controls_with_ethid <- function(all_db_seqs_annotated, args) {
   print(colnames(all_db_seqs_annotated))
   sample_name <- all_db_seqs_annotated$sample_name
-  print(sample_name)
+  #print(sample_name)
   controls <- grep("control", sample_name, ignore.case = TRUE)
   #print(controls)
   if(length(controls) > 0) {
@@ -353,28 +347,6 @@ get_sample_metadata <- function(db_connection, args, samples, raw_data_file_name
   ) %>% collect()
 
   join_w_reason <- left_join(x = query_seqs, y = query_main_meta, by = "ethid")
-
-
-#    query_main_meta <- query_main_meta %>% mutate(
-#        covv_orig_lab = case_when(
-#            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "viollier" ~ "Viollier AG",
-#            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "team_w" ~ "labor team w AG"),
-#        covv_orig_lab_addr = case_when(
-#            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "viollier" ~ "Hagmattstrasse 14, 4123 Allschwil",
-#            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "team_w" ~ "Blumeneggstrasse 55, 9403 Goldach")
-#    ) %>%
-#    collect()
-#    query_viollier <- query_viollier %>% mutate(sample_number = gsub(test_id, pattern=".*/",replacement = "")) %>% collect()
-
-
-###   join_viollier_w_reason <- left_join(x = query_seqs, y = query_viollier, by = "test_id")
-#   join_viollier <- left_join(x = query_seqs, y = query_viollier, by = "test_id")
-#  query_bag_sequence_report <- dplyr::tbl(db_connection, "bag_sequence_report") %>%
-#    select(auftraggeber_nummer, alt_seq_id, viro_purpose) %>% collect()
-#  join_viollier_w_reason <- left_join(  # merge in sequencing reason
-#    x = join_viollier,
-#    y = query_bag_sequence_report,
-#    by = c("sample_number" = "auftraggeber_nummer"))
 
   query_canton_code <- dplyr::tbl(db_connection, "swiss_postleitzahl") %>%  # get canton based on zip_code in metadata since canton is sometimes missing
     select(plz, canton) %>%
