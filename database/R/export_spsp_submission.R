@@ -186,6 +186,7 @@ get_samples_to_release <- function(db_connection, args) {
   all_db_seqs_annotated <- report_controls_with_ethid(all_db_seqs_annotated, args)
 
   to_release <- all_db_seqs_annotated %>% filter(qc_result == "no fail reason")
+  to_release <- report_resequenced_samples(to_release, db_connection, args)
   print(log.info(
     msg = paste("Found", nrow(to_release), "sequences in database to release."),
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
@@ -263,21 +264,65 @@ report_null_ethids <- function(all_db_seqs_annotated, args) {
   }
 }
 
+# Remove and report any control with ETHID. This can happen if a lab sends out an internal ctrl for sequencing within their plate
 report_controls_with_ethid <- function(all_db_seqs_annotated, args) {
   print(colnames(all_db_seqs_annotated))
   sample_name <- all_db_seqs_annotated$sample_name
-  #print(sample_name)
   controls <- grep("control", sample_name, ignore.case = TRUE)
-  #print(controls)
   if(length(controls) > 0) {
     print(notify.warn(
       msg = paste0("Removing ", length(controls), " control samples with ethid: ", paste(controls, collapse=",")),
       fcn = paste0(args$script_name, "::", "report_controls_with_ethid")))
     non_ctrls <- grep("control", sample_name, ignore.case = TRUE, invert = TRUE)
-    #print(paste("return"))
     return(all_db_seqs_annotated[non_ctrls,])
   }
 }
+
+# Remove and report any sample that is a re-sequencing and has NOT been submitted already.
+# We still need to submit re-sequencing of non-submitted samples because in that case the new sample may be done to solve the failure reason
+report_resequenced_samples <- function(to_release, db_connection, args) {
+  involved_labs <- strsplit(x = read_yaml(file = args$config)[["involved_labs"]], split = " ")[[1]]
+  labs_meta <- NULL
+  for(i in 1:length(involved_labs)){
+      labs_meta <- rbind(labs_meta,dplyr::tbl(db_connection, paste0(involved_labs[i], "_metadata")) %>% select(ethid, sample_number) %>% collect())
+  }
+  submitted <- dplyr::tbl(db_connection, "sequence_identifier") %>% select(ethid, spsp_uploaded_at, gisaid_uploaded_at) %>% collect()
+  submitted <- left_join(submitted, labs_meta, by="ethid")
+  on_spsp <- which(!is.na(submitted$spsp_uploaded_at))
+  on_gisaid <- which(!is.na(submitted$gisaid_uploaded_at))
+  tmp <- unique(c(on_spsp, on_gisaid))
+  submitted <- submitted[tmp,]
+  to_release_sn <- left_join(to_release, labs_meta, by="ethid")
+  reseq <- to_release_sn[which(to_release_sn$sample_number%in%submitted$sample_number),]
+  to_release_no_reseq <- to_release_sn[which(!to_release_sn$sample_number%in%submitted$sample_number),]
+  print(log.info(
+    msg = paste0("Detected ", nrow(reseq), " resequencings already submitted and removed from the submission: ", paste(reseq$ethid, collapse=",")),
+    fcn = paste0(args$script_name, "::", "report_resequenced_samples")))
+    if(nrow(reseq)>0){ 
+      print(log.info(
+        msg = "Updating database to ignore the sequence and logging the reason",
+        fcn = paste0(args$script_name, "::", "report_resequenced_samples")))  
+      
+      new_notes = data.frame(sample_name = reseq$sample_name, release_decision = TRUE, comment = "Re-sequencing")
+
+      key_col <- c("sample_name")
+      table_spec <- parse_table_specification(
+        table_name <- "consensus_sequence_notes", db_connection = db_connection)
+      cols_to_update <- c("release_decision", "comment")
+
+      update_table(
+    table_name = "consensus_sequence_notes",
+    new_table = new_notes,
+        con = db_connection,
+    append_new_rows = T,
+    cols_to_update = cols_to_update,
+    key_col = key_col,
+    table_spec = table_spec,
+    run_summarize_update = T)
+    }
+  return(to_release_no_reseq)
+}
+
 
 #' Query database to assemble sequence metadata.
 get_sample_metadata <- function(db_connection, args, samples, raw_data_file_names) {
