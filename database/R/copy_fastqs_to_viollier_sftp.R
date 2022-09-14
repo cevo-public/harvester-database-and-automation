@@ -28,11 +28,11 @@ while (!(continue %in% c('y', 'n'))) {
 
 # Look up sample info (including sample name) for the provided sample numbers
 db_connection <- open_database_connection("server")
-sample_info_with_metadata <- dplyr::tbl(db_connection, "viollier_test") %>% select(ethid, sample_number) %>%
+sample_info_with_metadata <- dplyr::tbl(db_connection, "viollier_metadata") %>% select(ethid, sample_number) %>%
   filter(sample_number %in% !! SAMPLE_NUMBERS) %>%
   left_join(dplyr::tbl(db_connection, "consensus_sequence") %>% select(ethid, sample_name), by = "ethid") %>%
-  left_join(dplyr::tbl(db_connection, "viollier_test__viollier_plate") %>% select(sample_number, viollier_plate_name), by = "sample_number") %>%
-  left_join(dplyr::tbl(db_connection, "viollier_plate") %>% select(sequencing_center, left_viollier_date, viollier_plate_name), by = "viollier_plate_name") %>%
+  left_join(dplyr::tbl(db_connection, "test_metadata") %>% select(ethid, test_id, order_date), by = "ethid") %>%
+  left_join(dplyr::tbl(db_connection, "test_plate_mapping") %>% select(test_id, extraction_plate), by = "test_id") %>%
   collect()
 
 sample_info <- merge(
@@ -51,7 +51,7 @@ system(command = paste("mkdir -p", base_dest_dir))
 
 for (i in 1:nrow(sample_info)) {
   sample_number <- sample_info$sample_number[i]
-  viollier_plate_name <- sample_info$viollier_plate_name[i]
+  viollier_plate_name <- unlist(lapply(strsplit(sample_info$extraction_plate[i],"/"),function(x)x[2]))
   sample_name <- sample_info$sample_name[i]
   source_dir <- paste(PANGODIR, "backup/sampleset", sample_name, sep = "/")
   dest_dir <- paste(base_dest_dir, sample_number, sep = "/")
