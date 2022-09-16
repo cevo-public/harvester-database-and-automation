@@ -152,7 +152,7 @@ class Parser():
                 return "other"
             elif x.isspace() or not x:
                 return "surveillance"
-            elif x.lower() in ["surveillance", "surveillance_hosp", "screening"]:
+            elif x.lower() in ["surveillance", "surveillance_hosp", "screening", "other"]:
                 return x.lower()
             elif x == 'NA':
                 return x
