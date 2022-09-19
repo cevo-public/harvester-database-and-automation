@@ -24,7 +24,7 @@ def import_sequences(
     # Connect to database
     db_connection = (
         f"dbname='{db_name}' user='{db_user}' host='{db_host}'"
-        f" password='{db_password}' port="5432"
+        f" password='{db_password}' port=5432"
     )
     try:
         conn = psycopg2.connect(db_connection)
