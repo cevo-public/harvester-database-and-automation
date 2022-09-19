@@ -1,8 +1,16 @@
-# Editors
-.idea/
+# Build artifacts
+__pycache__
+.pytest_cache
+/database/java/.gradle
+/database/java/bin
+logs
 
 # Configs
 database/config.yml
 
-# 
-logs
+# Files auto-created by operating system
+Thumbs.db
+.DS_Store
+
+# Editors
+.idea/
