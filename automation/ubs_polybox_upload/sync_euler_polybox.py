@@ -110,12 +110,12 @@ def fetch_processed_euler_samples():
         g2 = re.match(r"(.+?)-(.+)$", folder)
         if g:
             sample_name = g.group(1)
-            ethid = sample_name.split("_", 1)[0]
+            ethid = sample_name.split("--", 1)[0]
             batch = g.group(3)
             yield sample_name, ethid, batch
         elif g2:
             sample_name = g2.group(1)
-            ethid = sample_name.split("_", 1)[0]
+            ethid = sample_name.split("--", 1)[0]
             batch = g2.group(2)
             yield sample_name, ethid, batch
 
