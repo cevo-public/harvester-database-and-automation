@@ -12,7 +12,7 @@ RUN Rscript R/install_packages.R
 RUN apt-get update && apt-get install -y curl
 RUN curl -sL https://deb.nodesource.com/setup_lts.x | bash -
 RUN apt-get install -y nodejs
-RUN npm install --global @neherlab/nextclade
+RUN npm install --global @nextstrain/nextclade@0.14.4
 
 COPY database/ .
 
