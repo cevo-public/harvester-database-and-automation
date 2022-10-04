@@ -1,430 +1,495 @@
-import argparse
-import os
-import subprocess
+"""
+Imports V-pipe results into Vineyard database.
 
-from datetime import datetime
-import pandas as pd
+This script is usually run on Euler after a new batch of samples has
+been processed. First and foremost, it imports the consensus sequences
+for Covid samples that S3C was tasked to process. As opposed to other
+samples that V-pipe may also process, like from wastewater monitoring,
+the S3C samples should already have corresponding metadata in the
+Vineyard database, from an earlier step in the data pipeline when that
+metadata was received in the first place. The only S3C samples that
+wouldn't have metadata are (positive or negative) controls, which are
+often added to the sequencing plates for reasons of quality control.
+"""
+
 import psycopg2
 from Bio import SeqIO
+from pandas import read_csv
+import argparse
+import subprocess
+import os
+from pathlib import Path
+from datetime import datetime
 
 
-def import_sequences(
-    data_dir,
-    db_host,
-    db_name,
-    db_user,
-    db_password,
-    sample_names=None,
-    update=False,
-    batch=None,
-):
-    DEST_TABLE = "consensus_sequence"
-    DEST_TABLE_META = "consensus_sequence_meta"
+def read_sample_names(file):
+    """
+    Retrieves the sample names from the given file.
 
-    # Connect to database
-    db_connection = (
-        f"dbname='{db_name}' user='{db_user}' host='{db_host}'"
-        f" password='{db_password}' port=5432"
-    )
+    The `file` is expected to be a tab-separated `.tsv` file without
+    a header row, where the sample names are in the first column.
+    """
+    table = read_csv(file, header=None, sep='\t')
+    sample_names = table.iloc[:, 0].tolist()
+    return sample_names
+
+
+def read_sequence(file):
+    """Reads a `.fasta` file and returns the sequence as a string."""
+    seqs = list(SeqIO.parse(file, "fasta"))
+    assert len(seqs) == 1
+    return str(seqs[0].seq)
+
+
+def import_sequences(db_host, db_name, db_user, db_password,
+                     data_folder, sample_names=None, batch=None,
+                     update=False, dryrun=False):
+    """
+    Imports results for given `sample_names` as found in `data_folder`.
+
+    Skips samples for which results (i.e. consensus sequences) are already
+    in the database, unless `update` is `True`. A specific batch, such
+    as `'20220909_HJ5KWDRX2'` can be selected from folders in `data_folder`,
+    and must be when updating.
+    """
+
+    # Connect to database.
     try:
-        conn = psycopg2.connect(db_connection)
-    except Exception as e:
-        raise Exception("I am unable to connect to the database.", e)
+        conn = psycopg2.connect(dbname=db_name, host=db_host,
+                                user=db_user, password=db_password,
+                                connect_timeout=3)
+    except Exception:
+        raise ConnectionError("Unable to connect to the database.")
 
-    if sample_names is None:
-        # Fetch already included sample names
+    # Accept string of Path object for data folder.
+    data_folder = Path(data_folder)
+    print(f'Data folder: {data_folder}')
+
+    # Samples must be explicitly named when updating the database table.
+    if update and not sample_names:
+        raise ValueError("You need to specify a list of sample names "
+                         "if you want to update the table. Tread carefully!")
+
+    # If no samples named, import new samples found in data folder.
+    if not sample_names:
+        available = set(item.name for item in data_folder.iterdir()
+                        if item.is_dir())
+        print(f'Found {len(available)} available samples in data folder.')
         with conn.cursor() as cursor:
-            cursor.execute(
-                f"SELECT sample_name FROM {DEST_TABLE} WHERE seq_aligned IS NOT NULL"
-            )
-            imported_sample_names_tuples = cursor.fetchall()
-        imported_sample_names = [name for (name,) in imported_sample_names_tuples]
-
-        # Get set of new sample names with sequences available
-        available_sample_names = os.listdir(path=data_dir)
-        found_sample_names = list(
-            set(available_sample_names) - set(imported_sample_names)
-        )
-        print(
-            "Proposing to import {} new sequences not yet in the database".format(
-                len(found_sample_names)
-            )
-        )
+            cursor.execute("SELECT sample_name FROM consensus_sequence "
+                           "WHERE seq_aligned IS NOT NULL")
+            imported = set(name for (name,) in cursor.fetchall())
+        sample_names = sorted(available - imported)
+        print(f"Proposing to import {len(sample_names)} new sequences "
+              "not yet in the database.")
         while True:
-            IMPORT_INPUT = input("Do you want to import all these sequences? (y/n):\n")
-            if IMPORT_INPUT == "y":
+            answer = input("Proceed with the import? (y/n):\n")
+            if answer == "y":
                 break
-            elif IMPORT_INPUT == "n":
+            if answer == "n":
                 exit(0)
-            else:
-                print("You must enter either 'y' or 'n'.")
-    else:
-        # See how many of the specified samples are available
-        available_sample_names = os.listdir(path=data_dir)
-        found_sample_names = sorted(set(available_sample_names) & set(sample_names))
-        print(
-            "Going to import {} out of {} specified samples that were"
-            " found in {}.".format(len(found_sample_names), len(sample_names), data_dir)
-        )
-        print(
-            "These samples not found: {}".format(
-                sorted(set(sample_names) - set(found_sample_names))
-            )
-        )
+            print("You must enter either 'y' or 'n'.")
 
-    # Require that specific sample names be provided in order to update the table
-    if sample_names is None and update:
-        raise ValueError(
-            "You need to specify a list of sample names if you want to update the"
-            " table. Tread carefully!"
-        )
+    # Keep track of samples we'll skip for various reasons.
+    folder_missing = []
+    no_test_id     = []
+    plate_missing  = []
+    invalid_ethid  = []
+    batch_missing  = []
+    file_missing   = []
+    no_seq_center  = []
+    already_exists = []
 
-    # Iterate through the sequences, importing them into the database
+    # Iterate through list of samples to import.
     cursor = conn.cursor()
-    i = 0
-    missing_seq_file = []
+    for sample_name in sample_names:
 
-    def read_single(sample_name, file_name):
-        path = os.path.join(
-            data_dir, sample_name, batch_to_import, "references", file_name
-        )
-        seqs = list(SeqIO.parse(path, "fasta"))
-        assert len(seqs) == 1
-        return str(seqs[0].seq)
+        # Check that sample folder exists.
+        if not (data_folder/sample_name).is_dir():
+            print(f"SKIPPING: {sample_name}")
+            print("No sample folder found.")
+            folder_missing.append(sample_name)
+            continue
 
-    for sample_name in found_sample_names:
-
+        # Sample number is what's before the first separator.
         sample_number, *rest = sample_name.split("_")
-        cursor.execute(
-            f"""
-            SELECT test_id
-            FROM test_metadata
-            WHERE test_id LIKE '%/{sample_number}';""",
-        )
-        values = [v[0] for v in cursor.fetchall()]
-        if not values:
-            print(f"no test_id found which matches {sample_number}, skip import")
-            continue
-        if len(values) > 1:
-            print(
-                f"found multiple test_ids which match {sample_number}: {values},"
-                " skip import"
-            )
-            continue
 
-        test_id = values[0]
-
-        if len(rest) == 4:
-            plate, well, type_, opt = rest
+        # Literal "ETHID" marks a control, i.e. not an actual sample.
+        # Actual samples must already have metadata in the database.
+        test_id = None
+        is_control = False
+        if sample_number == 'ETHID':
+            is_control = True
         else:
-            print(
-                f"filename {sample_name} did not follow ETHID_PLATE_WELL_TYPE_OPT"
-                " convetion."
-            )
-            cursor.execute(
-                """
-                SELECT sequencing_plate, sequencing_plate_well
-                FROM test_plate_mapping
-                JOIN test_metadata
-                ON test_plate_mapping.test_id = test_metadata.test_id
-                WHERE test_metadata.test_id=%s;""",
-                (test_id,),
-            )
+            cursor.execute("SELECT test_id FROM test_metadata "
+                           f"WHERE test_id LIKE '%/{sample_number}'")
+            values = [row[0] for row in cursor.fetchall()]
+            if not values:
+                print(f"SKIPPING: {sample_name}")
+                print("No test_id found.")
+                no_test_id.append(sample_name)
+                continue
+            if len(values) > 1:
+                print(f"SKIPPING: {sample_name}")
+                print(f"Multiple test_ids: {values}")
+                no_test_id.append(sample_name)
+                continue
+            test_id = values[0]
 
+        # Try to get sequencing plate and sequencing well from sample name.
+        if len(rest) == 4 or (is_control and len(rest) == 5):
+            (plate, well) = rest[:2]
+
+        # Query plate and well from database if name could not be parsed.
+        elif test_id:
+            print(f"Sample name {sample_name} did not follow "
+                  "ETHID_PLATE_WELL_TYPE_OPT convention.")
+            print('Querying database for sequencing plate and well.')
+
+            cursor.execute("SELECT sequencing_plate, sequencing_plate_well "
+                           "FROM test_plate_mapping "
+                           "WHERE test_id=%s", (test_id,))
             rows = cursor.fetchall()
-            if not rows:
-                print(
-                    "test_plate_mapping inconsistency: did not find entry for"
-                    f" test_id={test_id}"
-                )
-                plate, well = None, None
+            if rows:
+                (plate, well) = rows[0]
             else:
-                plate, well = rows[0]
+                print(f"SKIPPING: {sample_name}")
+                print(f"Did not find {test_id=} in table test_plate_mapping.")
+                plate_missing.append(sample_name)
+                continue
 
-        i += 1
-        if batch is None:
-            # take sequences from 1st available batch -- you may want to specify a
-            # different batch folder in the event of a re-run
-            batch_to_import = os.listdir(path=data_dir + "/" + sample_name)[0]
+        # Otherwise it must be a control without plate/well information.
         else:
-            batch_to_import = batch
+            print(f"SKIPPING: {sample_name}")
+            print("Could not determine sequencing plate.")
+            plate_missing.append(sample_name)
+            continue
 
-        seq_aligned = read_single(sample_name, "ref_majority_dels.fasta")
-        seq_unaligned = read_single(sample_name, "consensus_ambig.bcftools.fasta")
-
+        # ETH-ID should be a number, except for controls.
         try:
-            # only works for viollier data, not for teamW
             ethid = int(sample_number)
         except ValueError:
-            ethid = None
+            if is_control:
+                ethid = None
+            else:
+                print(f"SKIPPING: {sample_name}")
+                print("Sample number is not an integer.")
+                invalid_ethid.append(sample_name)
+                continue
 
+        # If no specific batch was chosen, take sequences from earliest batch.
+        # There would usually be just one batch though. In the event of a
+        # re-run, you want to specify the correct batch.
+        if not batch:
+            batches = sorted(item.name
+                             for item in (data_folder/sample_name).iterdir()
+                             if item.is_dir())
+            batch_folder = data_folder/sample_name/batches[0]
+        else:
+            batch_folder = data_folder/sample_name/batch
+        if not batch_folder.exists():
+            print(f"SKIPPING: {sample_name}")
+            print(f"Batch folder does not exist: {batch_folder}.")
+            batch_missing.append(sample_name)
+            continue
+
+        # Read consensus sequence from files.
+        folder = batch_folder/'references'
+        file = folder/'ref_majority_dels.fasta'
+        if not file.exists():
+            print(f"SKIPPING: {sample_name}")
+            print(f"File not found: {file}")
+            file_missing.append(sample_name)
+            continue
+        seq_aligned = read_sequence(file)
+        file = folder/'consensus_ambig.bcftools.fasta'
+        if not file.exists():
+            print(f"SKIPPING: {sample_name}")
+            print(f"File not found: {file}")
+            file_missing.append(sample_name)
+            continue
+        seq_unaligned = read_sequence(file)
+
+        # Look up sequencing center.
+        cursor.execute(
+            "SELECT sequencing_center "
+            "FROM sequencing_plate "
+            "WHERE sequencing_plate_name=%s",
+            (plate,),
+        )
+        rows = cursor.fetchall()
+        if len(rows) > 1:
+            print(f"SKIPPING: {sample_name}")
+            print("Found multiple sequencing centers.")
+            no_seq_center.append(sample_name)
+            continue
+        if rows:
+            sequencing_center = rows[0][0]
+        elif is_control:
+            sequencing_center = 'gfb'
+        else:
+            cursor.execute("select extraction_plate from test_plate_mapping "
+                          f"where test_id like '%/{sample_number}'")
+            rows = cursor.fetchall()
+            if len(rows) != 1:
+                print(f"SKIPPING: {sample_name}")
+                print("Failed to look up extraction plate.")
+                no_seq_center.append(sample_name)
+                continue
+            extraction_plate = rows[0][0]
+            cursor.execute("select sequencing_center from extraction_plate "
+                           "where extraction_plate_name=%s",
+                           (extraction_plate,))
+            rows = cursor.fetchall()
+            if len(rows) != 1:
+                print(f"SKIPPING: {sample_name}")
+                print("Failed to look up sequencing center.")
+                no_seq_center.append(sample_name)
+                continue
+            sequencing_center = rows[0][0]
+
+        # Add results for this sample to database.
         try:
             cursor.execute(
-                f"INSERT INTO {DEST_TABLE}"
-                "   (sample_name, seq_aligned, seq_unaligned, sequencing_batch, "
-                "    sequencing_plate, sequencing_plate_well, ethid, insert_date) "
-                # "    sequencing_center)"
-                " VALUES(%s, %s, %s, %s, %s, %s, %s, %s)",
+                "INSERT INTO consensus_sequence ("
+                "sample_name, "
+                "seq_aligned, "
+                "seq_unaligned, "
+                "sequencing_batch, "
+                "sequencing_plate, "
+                "sequencing_plate_well, "
+                "sequencing_center, "
+                "ethid, "
+                "insert_date) "
+                "VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     sample_name,
                     seq_aligned,
                     seq_unaligned,
-                    batch_to_import,
+                    batch_folder.name,
                     plate,
                     well,
+                    sequencing_center,
                     ethid,
-                    datetime.now()
-                    # sequencing_center
+                    datetime.now(),
                 ),
             )
 
+            # Add entry to separate metadata table as well.
             cursor.execute(
-                """
-            SELECT S.sequencing_center
-            FROM sequencing_plate as S
-            JOIN consensus_sequence as C
-            ON   S.sequencing_plate_name = C.sequencing_plate
-            WHERE C.sample_name=%s;
-            """,
+                "INSERT INTO consensus_sequence_meta (sample_name) VALUES(%s)",
                 (sample_name,),
             )
-            sequencing_centers = cursor.fetchall()
 
-            if len(sequencing_centers) == 0:
-                print(f"cannot determine sequencing center for {sample_name}")
-                sequencing_center = None
-            elif len(sequencing_centers) > 1:
-                print(
-                    f"found multiple sequencing centers for {sample_name}:"
-                    f" {sequencing_centers}"
-                )
-                sequencing_center = None
-            else:
-                sequencing_center = sequencing_centers[0][0]
+            # Insert new data into database.
+            if not dryrun:
+                conn.commit()
+            print(f"Imported: {sample_name}")
+
+        # Revert if insertion failed. Possibly update database instead.
+        except psycopg2.errors.UniqueViolation:
+
+            conn.rollback()
+
+            if not update:
+                print(f"SKIPPING: {sample_name}")
+                print("Sequence already in database and no update requested.")
+                already_exists.append(sample_name)
+                continue
 
             cursor.execute(
-                f"UPDATE {DEST_TABLE}"
-                " SET sequencing_center = %s WHERE sample_name = %s",
+                "UPDATE consensus_sequence "
+                "SET "
+                "seq_aligned = %s, "
+                "seq_unaligned = %s, "
+                "sequencing_batch = %s, "
+                "update_date = %s "
+                "WHERE sample_name = %s",
                 (
-                    sequencing_center,
+                    seq_aligned,
+                    seq_unaligned,
+                    batch_folder.name,
+                    datetime.now(),
                     sample_name,
                 ),
             )
 
-            cursor.execute(
-                f"INSERT INTO {DEST_TABLE_META} (sample_name) VALUES(%s)",
-                (sample_name,),
+            # Re-insert sample in sequence metadata tables so that other
+            # tools (such as Nextclade) run on it once again.
+            tables = (
+                "consensus_sequence_mutation_nucleotide",
+                "consensus_sequence_mutation_aa",
+                "consensus_sequence_meta",
             )
-            conn.commit()
-        except psycopg2.errors.UniqueViolation:
-            # revert the failed cursor.execute(INSERT) and instead try an UPDATE
-            conn.rollback()
-            if update:
-                cursor.execute(
-                    f"UPDATE {DEST_TABLE}"
-                    " SET seq_aligned = %s, seq_unaligned = %s, sequencing_batch = %s, "
-                    "     update_date = %s WHERE sample_name = %s",
-                    (
-                        seq_aligned,
-                        seq_unaligned,
-                        batch_to_import,
-                        datetime.now(),
-                        sample_name,
-                    ),
-                )
-                # Drop rows in nextclade tables so nextclade will be re-run on
-                # the updated sequences
-                for table in (
-                    "consensus_sequence_mutation_nucleotide",
-                    "consensus_sequence_mutation_aa",
-                    "consensus_sequence_meta",
-                ):
-                    cursor.execute(
-                        f"DELETE FROM {table} WHERE sample_name = %s",
-                        (sample_name,),
-                    )
-                cursor.execute(
-                    f"INSERT INTO consensus_sequence_meta (sample_name) VALUES(%s)",
-                    (sample_name,),
-                )
-            else:
-                print(
-                    "Not adding {} because update = False and sample"
-                    " already in table.".format(sample_name)
-                )
-            conn.commit()
+            for table in tables:
+                cursor.execute(f"DELETE FROM {table} WHERE sample_name = %s",
+                               (sample_name,))
+            cursor.execute(
+                "INSERT INTO consensus_sequence_meta "
+                "(sample_name) VALUES(%s)",
+                (sample_name,))
 
-        except FileNotFoundError:
-            print("File not found, will not import sequence:" + seq_file)
-            missing_seq_file.append(sample_name)
-            continue
-
-        print("Imported sequence {}/{}".format(i, len(found_sample_names)))
+            if not dryrun:
+                conn.commit()
+            print(f"Updated: {sample_name}")
 
     cursor.close()
     conn.close()
-    if len(missing_seq_file) > 0:
-        raise Warning(
-            "These {} samples don't have a sequence file and were not"
-            " imported:\n {}".format(len(missing_seq_file), "\n".join(missing_seq_file))
-        )
+
+    # Display collected skip reasons if this was a dry run.
+    if dryrun:
+        print()
+        print('Dry-run summary')
+        print('---------------')
+        if folder_missing:
+            print('Data folder missing:')
+            for sample_name in folder_missing:
+                print(f'  {sample_name}')
+        if no_test_id:
+            print('Test ID missing:')
+            for sample_name in no_test_id:
+                print(f'  {sample_name}')
+        if plate_missing:
+            print('Sequencing plate missing:')
+            for sample_name in plate_missing:
+                print(f'  {sample_name}')
+        if invalid_ethid:
+            print('ETH-ID invalid:')
+            for sample_name in invalid_ethid:
+                print(f'  {sample_name}')
+        if batch_missing:
+            print('Batch folder missing:')
+            for sample_name in batch_missing:
+                print(f'  {sample_name}')
+        if file_missing:
+            print('Sequence file missing:')
+            for sample_name in file_missing:
+                print(f'  {sample_name}')
+        if no_seq_center:
+            print('Sequencing center unknown:')
+            for sample_name in no_seq_center:
+                print(f'  {sample_name}')
+        if already_exists:
+            print('Already exists in database:')
+            for sample_name in already_exists:
+                print(f'  {sample_name}')
 
 
 def run_automated():
     print("Running in automated mode.")
-    import_sequences(
-        # "samples",
-        "/mnt/pangolin/consensus_data/batch/samples",
-        os.getenv("DB_HOST"),
-        os.getenv("DB_DBNAME"),
-        os.getenv("DB_USER"),
-        os.getenv("DB_PASSWORD"),
-        # os.listdir("samples"),
-    )
+
+    db_host     = os.getenv("DB_HOST"),
+    db_name     = os.getenv("DB_DBNAME"),
+    db_user     = os.getenv("DB_USER"),
+    db_password = os.getenv("DB_PASSWORD"),
+    data_folder = "/mnt/pangolin/consensus_data/batch/samples"
+
+    import_sequences(db_host, db_name, db_user, db_password, data_folder)
 
 
 def run_euler():
-    print("Running in euler mode.")
+    print("Running in Euler mode.")
 
-    DB_NAME = os.environ.get("DB_NAME")
-    DB_HOST = os.environ.get("DB_HOST")
-    DB_USER = os.environ.get("DB_USER")
+    db_name = os.environ.get("DB_NAME")
+    db_host = os.environ.get("DB_HOST")
+    db_user = os.environ.get("DB_USER")
 
-    if DB_NAME is None:
-        DB_NAME = input("Enter database name:\n")
-    if DB_HOST is None:
-        DB_HOST = input("Enter database host:\n")
+    if db_name is None:
+        db_name = input("Enter database name:\n")
+    if db_host is None:
+        db_host = input("Enter database host:\n")
 
-    BATCH = input("Enter batch name to import:\n")
+    batch = input("Enter batch name to import:\n")
 
-    UPDATE = None
-    while UPDATE is None:
-        UPDATE_INPUT = input(
-            "Do you want to overwrite existing sequences if already in"
-            " database? (y/n):\n"
-        )
-        if UPDATE_INPUT == "y":
-            UPDATE = True
-        elif UPDATE_INPUT == "n":
-            UPDATE = False
+    update = None
+    while update is None:
+        answer = input("Do you want to overwrite existing sequences "
+                       "if already in database? (y/n):\n")
+        if answer == "y":
+            update = True
+        elif answer == "n":
+            update = False
         else:
             print("You must enter either 'y' or 'n'.")
 
-    if DB_USER is None:
-        DB_USER = input(f"Enter username for database {DB_NAME}:\n")
+    if db_user is None:
+        db_user = input(f"Enter username for database {db_name}:\n")
+    db_password = input(f"Enter password for user {db_user}:\n")
 
-    DB_PASSWORD = input(f"Enter password for user {DB_USER}:\n")
-    SAMPLESET_TOPLEVEL_DIR = "/cluster/project/pangolin/working/samples"
-    SAMPLE_LIST = "/cluster/project/pangolin/sampleset/samples." + BATCH + ".tsv"
+    project_folder = Path('/cluster/project/pangolin')
+    data_folder    = project_folder/'working'/'samples'
+    sample_list    = project_folder/'sampleset'/f'samples.{batch}.tsv'
+    sample_names   = read_sample_names(sample_list)
 
-    # Get list of samples to import
-    df = pd.read_csv(
-        SAMPLE_LIST, names=["sample_name", "sequencing_batch", "heh?"], sep="\t"
-    )
-    sample_list = df["sample_name"].tolist()
-
-    # Import consensus sequences
     print("Importing consensus sequences.")
-    import_sequences(
-        SAMPLESET_TOPLEVEL_DIR,
-        DB_HOST,
-        DB_NAME,
-        DB_USER,
-        DB_PASSWORD,
-        sample_names=sample_list,
-        batch=BATCH,
-        update=UPDATE,
-    )
+    import_sequences(db_host, db_name, db_user, db_password,
+                     data_folder, sample_names, batch, update)
 
-    # Import frameshift deletion diagnostics
+    # Import frameshift deletion diagnostics.
     print("Calling Rscript to import frameshift diagnostics.")
-    process = subprocess.Popen(
-        [
-            "Rscript",
-            "--vanilla",
-            "database/R/import_frameshift_deletion_diagnostic.R",
-            "--samplesdir",
-            SAMPLESET_TOPLEVEL_DIR,
-            "--dbhost",
-            DB_HOST,
-            "--dbuser",
-            DB_USER,
-            "--dbpassword",
-            DB_PASSWORD,
-            "--dbname",
-            DB_NAME,
-            "--batch",
-            BATCH,
-            "--dbport",
-            "5432",
-        ],
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-
-    while True:
-        output = process.stdout.readline()
-        if output == "" and process.poll() is not None:
-            break
-        if output:
-            print(output.rstrip())
-        process.poll()
+    subprocess.run([
+        "Rscript",
+        "--vanilla",
+        "database/R/import_frameshift_deletion_diagnostic.R",
+        "--samplesdir", data_folder,
+        "--dbhost", db_host,
+        "--dbuser", db_user,
+        "--dbpassword", db_password,
+        "--dbname", db_name,
+        "--batch", batch,
+        "--dbport", "5432",
+    ], check=True)
 
 
-def run_manual():
+def run_manual(dryrun=False):
     print("Running in manual mode.")
-    DB_NAME = input("Enter database name:\n")
-    DB_HOST = input("Enter database host:\n")
-    DB_USER = input("Enter username for database {DB_NAME}:\n")
-    DB_PASSWORD = input("Enter password for user {DB_USER}:\n")
-    SAMPLESET_TOPLEVEL_DIR = input("Enter samples directory (no quotes!):\n")
-    SAMPLE_LIST = input(
-        "Enter full path (no quotes!) to tab-separated samples file with"
-        " 1st column of sample names:\n"
-    )
 
-    df = pd.read_csv(
-        SAMPLE_LIST,
-        names=["sample_name", "sequencing_batch", "heh?"],
-        sep="\t",
-        comment="#",
-    )  # 2nd 2 columns will be ignored, they're optional
+    db_name     = input("Enter database name:\n")
+    db_host     = input("Enter database host:\n")
+    db_user     = input(f'Enter username for database "{db_name}":\n')
+    db_password = input(f'Enter password for user "{db_user}":\n')
+    data_folder = input("Enter samples directory (no quotes!):\n")
+    sample_list = input("Enter full path (no quotes!) to tab-separated "
+                        "samples file with sample names in first column:\n")
 
-    sample_list = df["sample_name"].tolist()
-    import_sequences(
-        SAMPLESET_TOPLEVEL_DIR,
-        DB_HOST,
-        DB_NAME,
-        DB_USER,
-        DB_PASSWORD,
-        sample_names=sample_list,
-    )
+    sample_names = read_sample_names(sample_list)
+
+    import_sequences(db_host, db_name, db_user, db_password,
+                     data_folder, sample_names,
+                     dryrun=dryrun)
 
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Import sequences into the database")
+    parser = argparse.ArgumentParser(
+        description="Import sequences into the database.",
+    )
     parser.add_argument(
         "--automated",
         const=True,
         default=False,
         action="store_const",
-        help="Run the script as part of the automation",
+        help="Run the script as part of the automation.",
     )
     parser.add_argument(
         "--euler",
         const=True,
         default=False,
         action="store_const",
-        help="Run the script to fetch sequences from Euler",
+        help="Run the script to fetch sequences from Euler.",
+    )
+    parser.add_argument(
+        "--dryrun",
+        const=True,
+        default=False,
+        action="store_const",
+        help="Only perform a dry-run.",
     )
     args = parser.parse_args()
 
     if args.automated:
         run_automated()
-
     elif args.euler:
         run_euler()
-
     else:
-        run_manual()
+        run_manual(args.dryrun)
