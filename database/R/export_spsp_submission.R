@@ -615,7 +615,7 @@ read_seq_authors <- function(args) {
 insert_additional_metadata <- function(metadata, args, db_connection){
   involved_labs <- strsplit(x = read_yaml(file = args$config)[["involved_labs"]], split = " ")[[1]]
   labs_meta <- list()
-  ethids <- unlist(lapply(strsplit(metadata$reporting_lab_order_id, "_"), function(x)x[1]))
+  ethids <- unlist(lapply(strsplit(metadata$reporting_lab_order_id, "--"), function(x)x[1]))
 
   for(i in 1:length(involved_labs)){
     if(involved_labs[i] == "teamw"){next()}
