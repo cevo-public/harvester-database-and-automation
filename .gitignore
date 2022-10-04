@@ -1,12 +1,16 @@
 # Build artifacts
 __pycache__
-.pytest_cache
 /database/java/.gradle
 /database/java/bin
+
+# Test artifacts
+.pytest_cache
+/tests/database_dump.bak
 logs
 
-# Configs
-database/config.yml
+# Configuration files
+/tests/database.yaml
+/database/config.yml
 
 # Files auto-created by operating system
 Thumbs.db
