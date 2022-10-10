@@ -10,6 +10,7 @@ RUN cd /build && chmod +x gradlew && ./gradlew clean build -x test && ls -l /bui
 
 FROM openjdk:17-slim-buster AS server
 
+# Update packages
 RUN apt-get update && apt-get install -y npm curl wget
 
 # Install nextclade
