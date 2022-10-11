@@ -94,7 +94,7 @@ spawn_ssh_process <- function(config, date, samples)
                 "-o", "StrictHostKeyChecking=accept-new",
                 "spsp",
                 uploads_folder,
-                date,
+                toString(date),
                 passphrase,
                 samples
             )
