@@ -127,7 +127,6 @@ ext_fso_cross_border_commuters	date	"Date of observation. The data is quarterly,
 ext_fso_cross_border_commuters	n_permits	Number of cross-border workers with G permit.
 frameshift_deletion_diagnostic	sample_name	Name given to the sequenced material (assigned by the sequencing center).
 frameshift_deletion_diagnostic	start_position	Start position of deletion with respect to reference genome MN908947.
-frameshift_deletion_diagnostic  indel_type  Type of mutation detected (deletion/insertion/stopgain/stoploss)
 frameshift_deletion_diagnostic	length	Length of deletion (in nucleotide units).
 frameshift_deletion_diagnostic	gene_region	Gene in which the deletion is found. Lara says the nucleotide position to gene mapping is taken somehow from the visualization part of V-pipe: https://github.com/cbg-ethz/V-pipe/blob/caesar_div/references/gffs/Genes_NC_045512.2.GFF3
 frameshift_deletion_diagnostic	reads_all	Total number of reads covering the first position of the deletion.
@@ -139,25 +138,13 @@ frameshift_deletion_diagnostic	freq_del_fwd	Fraction of forward reads supporting
 frameshift_deletion_diagnostic	freq_del_rev	Fraction of reverse reads supporting the deletion.
 frameshift_deletion_diagnostic	deletions_fwd	Number of forward reads supporting the deletion.
 frameshift_deletion_diagnostic	deletions_rev	Number of reverse reads supporting the deletion.
-frameshift_deletion_diagnostic  insertions  Number of reads supporting the insertion.
-frameshift_deletion_diagnostic  freq_insert Fraction of reads supporting the insertion.
-frameshift_deletion_diagnostic  freq_insert_fwd Fraction of forward reads supporting the insertion.
-frameshift_deletion_diagnostic  freq_insert_rev Fraction of reverse reads supporting the insertion.
-frameshift_deletion_diagnostic  insertions_fwd  Number of forward reads supporting the insertion.
-frameshift_deletion_diagnostic  insertions_rev  Number of reverse reads supporting the insertion
 frameshift_deletion_diagnostic	matches_ref	Number of reads where the base matches the ref-base.
 frameshift_deletion_diagnostic	pos_critical_inserts	Start positions (in reference genome coordinates) of insertions in the same gene_region that occur in > 40% of reads.
 frameshift_deletion_diagnostic	pos_critical_dels	Start positions (in reference genome coordinates) of deletions in the same gene_region that occur in > 40% of reads.
 frameshift_deletion_diagnostic	homopolymeric	"True if either around the start or end position of the deletion three bases are the same, which may have caused the polymerase to skip during reverse transcription of viral RNA to cDNA, e.g. AATAG."
 frameshift_deletion_diagnostic	ref_base	Base in the reference genome.
-frameshift_deletion_diagnostic	indel_diagnosis	Summary of support for / explanation of the frameshift insertion/deletion or the stopgain/stoploss event. This is reported to GISAID upon submission.
-frameshift_deletion_diagnostic	indel_position	Long form summary of insertion/deletion/stopgain/stoploss position for report to GISAID.
-frameshift_deletion_diagnostic  stops   Number of reads supporting the stop codon (count is done at the first position of the codon).
-frameshift_deletion_diagnostic  freq_stop   Fraction of reads supporting the stop codon.
-frameshift_deletion_diagnostic  freq_stop_fwd   Fraction of forward reads supporting the stop codon.
-frameshift_deletion_diagnostic  freq_stop_rev   Fraction of reverse reads supporting the stop codon.
-frameshift_deletion_diagnostic  stops_fwd   Number of forward reads supporting the stop codon.
-frameshift_deletion_diagnostic  stops_rev Number of reverse reads supporting the stop codon.
+frameshift_deletion_diagnostic	deletion_diagnosis	Summary of support for / explanation of the frameshift deletion. This is reported to GISAID upon submission.
+frameshift_deletion_diagnostic	deletion_position	Long form summary of deletion position for report to GISAID.
 swiss_wastewater_plant		Wastewater plant names.
 foph_travel_quarantine		Compilation of FOPH travel quarantine orders (created by hand on 10.03.2021). Sources are copies of the quarantine law from https://www.bag.admin.ch/bag/en/home/krankheiten/ausbrueche-epidemien-pandemien/aktuelle-ausbrueche-epidemien/novel-cov/empfehlungen-fuer-reisende/liste.html and https://www.fedlex.admin.ch/eli/cc/2020/496/en.
 ext_country_coordinates		"Coordinates of the centroids of various countries taken from the R package CoordinateCleaner's data, which they say they get from http://geo-locate.org. Since there are multiple entries per country, these are the average coordinates."

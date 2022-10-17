@@ -119,16 +119,14 @@ collect_results <- function(std_out, std_err) {
         cat(paste("stdout: ", line, "\n"))
         fields <- strsplit(line, ' ')[[1]]
         if (fields[1] == "UPLOAD") {
-            sample_id <- fields[3];
-            filename <- fields[4];
+            sample_id <- fields[2];
+            filename <- fields[3];
             if (grepl("_R1.", filename, fixed=TRUE))
                 r1_files[[sample_id]] <- basename(filename)
-            else if (grepl("\\.cram$", filename, fixed=FALSE))
+            else if (grepl(".cram$", filename, fixed=TRUE))
                 r1_files[[sample_id]] <- basename(filename)
-            else if (grepl("_R2.", filename, fixed=TRUE))
-                r2_files[[sample_id]] <- basename(filename)
             else
-                stop(paste("no idea how to handle", filename))
+                r2_files[[sample_id]] <- basename(filename)
         }
     }
     return(list(r1_files=r1_files, r2_files=r2_files))
