@@ -11,14 +11,14 @@ generate_alignment <- function(db_connection, sample_names, seq_outfile,
                                metadata_outfile, 
                                seq_table_name = "consensus_sequence",
                                sample_name_col = "sample_name",
-                               seq_col = "seq_unaligned",
+                               seq_col = "seq_aligned",
                                metadata_table_name = "test_metadata",
                                key_col = "ethid",
                                plate_col = "sequencing_plate",
                                well_col = "sequencing_plate_well",
                                date_col = "order_date",
                                merging_table_name = "test_plate_mapping",
-                               main_key = "test_id") {
+                               main_key = "ethid") {
   for (file in c(seq_outfile, metadata_outfile)) {
     if (file.exists(file)) {
       system(command = paste("rm", file))
@@ -29,25 +29,25 @@ generate_alignment <- function(db_connection, sample_names, seq_outfile,
     select(!!sym(sample_name_col), !!sym(seq_col), !!sym(key_col), !!sym(plate_col), !!sym(well_col))
   seq_tbl <- seq_query %>% collect()
 
-#  merging_table <- dplyr::tbl(db_connection, merging_table_name) %>%
-#    select(!!sym(main_key), !!sym(plate_col), !!sym(well_col)) %>% collect()
-#
-#  #seq_tbl <- merge(x = seq_tbl, y = merging_table, all.x = T, all.y = F)
-#  seq_tbl <- left_join(x=seq_tbl, y=merging_table, by=c(plate_col, well_col), na_matches="never")
-#
-#  keys <- unlist(seq_tbl[[main_key]])
-#  metadata_query <- dplyr::tbl(db_connection, metadata_table_name) %>%
-#    filter(!!sym(main_key) %in% keys) %>%
-#    select(!!sym(main_key), !!sym(date_col))
-#  metadata_tbl <- metadata_query %>% collect()
-#  if (sample_name_col == main_key) {
-#    selected_cols <- sample_name_col
-#  } else {
-#    selected_cols <- c(sample_name_col, main_key)
-#  }
-#  metadata_tbl <- merge(x = metadata_tbl, y = seq_tbl[, selected_cols], all.y = T) %>%
-#    mutate(virus = "ncov", region = "dummy_region", date_submitted = as.Date(!!sym(date_col)) + 14) %>%
-#    rename(name = !!sym(sample_name_col), date = !!sym(date_col))
+  #merging_table <- dplyr::tbl(db_connection, merging_table_name) %>%
+  #  select(!!sym(main_key), !!sym(plate_col), !!sym(well_col)) %>% collect()
+
+  #seq_tbl <- merge(x = seq_tbl, y = merging_table, all.x = T, all.y = F)
+  #seq_tbl <- left_join(x=seq_tbl, y=merging_table, by=c(plate_col, well_col), na_matches="never")
+
+  keys <- unlist(seq_tbl[[main_key]])
+  metadata_query <- dplyr::tbl(db_connection, metadata_table_name) %>%
+    filter(!!sym(main_key) %in% keys) %>%
+    select(!!sym(main_key), !!sym(date_col))
+  metadata_tbl <- metadata_query %>% collect()
+  if (sample_name_col == main_key) {
+    selected_cols <- sample_name_col
+  } else {
+    selected_cols <- c(sample_name_col, main_key)
+  }
+  metadata_tbl <- merge(x = metadata_tbl, y = seq_tbl[, selected_cols], all.y = T) %>%
+    mutate(virus = "ncov", region = "dummy_region", date_submitted = as.Date(!!sym(date_col)) + 14) %>%
+    rename(name = !!sym(sample_name_col), date = !!sym(date_col))
   
   seq_outfile_con <- file(seq_outfile, open = "a")
   seq_tbl <- seq_tbl %>% mutate("header" = paste0(">", !!sym(sample_name_col)))
@@ -159,7 +159,7 @@ import_sequence_diagnostic <- function (
       filter(!is.null(seq_aligned)) %>%
       select(sample_name) %>% collect()
     query_meta <- dplyr::tbl(db_connection, "consensus_sequence_meta") %>%
-      filter(!is.null(diagnostic_number_n)) %>%
+      filter(is.null(diagnostic_number_n)) %>%
       select(sample_name) %>% collect()
     query <- query$sample_name[query$sample_name %in% query_meta$sample_name]
   }
