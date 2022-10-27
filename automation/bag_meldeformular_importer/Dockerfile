@@ -1,3 +1,3 @@
 FROM registry.ethz.ch/sars_cov_2/s3c/harvester-database-and-automation:base_image_r_and_python
 
-ENTRYPOINT Rscript /app/R/automation/auto_import_bag_meldeformular.R && Rscript /app/R/automation/auto_export_bag_sequence_report.R
+ENTRYPOINT ["/bin/bash", "-c", "Rscript /app/R/automation/auto_import_bag_meldeformular.R && Rscript /app/R/automation/auto_export_bag_sequence_report.R"]
