@@ -13,4 +13,4 @@ WORKDIR /app
 
 COPY --from=builder /build/build/libs /app
 
-ENTRYPOINT ["java", "-Xmx12g", "-jar", "/app/vineyard-1.0-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-Xmx12g", "-jar", "./vineyard-1.0-SNAPSHOT.jar"]

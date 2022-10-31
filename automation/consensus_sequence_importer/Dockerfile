@@ -7,5 +7,6 @@ RUN cd /app/python/ncov && git checkout 76d9d30dc196ecbbb24650605573ad2eef486081
 COPY entrypoint.sh /app
 RUN chmod +x /app/entrypoint.sh
 
+WORKDIR /app
 
-ENTRYPOINT ["bash", "/app/entrypoint.sh"]
+ENTRYPOINT ["bash", "./entrypoint.sh"]

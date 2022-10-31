@@ -13,4 +13,6 @@ RUN wget https://mafft.cbrc.jp/alignment/software/mafft_7.475-1_amd64.deb \
 COPY reference.fasta align_splits.sh insert_data.sh nextclade_splits.sh /app
 RUN chmod +x /app/align_splits.sh /app/nextclade_splits.sh
 
-ENTRYPOINT ["/bin/bash", "-c", "cd /app && Rscript R/automation/auto_import_gisaid.R --main"]
+WORKDIR /app
+
+ENTRYPOINT ["Rscript", "R/automation/auto_import_gisaid.R", "--main"]

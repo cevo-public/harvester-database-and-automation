@@ -4,4 +4,6 @@ FROM registry.ethz.ch/sars_cov_2/s3c/harvester-database-and-automation:base_imag
 RUN curl -sL https://deb.nodesource.com/setup_lts.x | bash -
 RUN npm install --global @neherlab/nextclade
 
-ENTRYPOINT ["Rscript", "/app/R/automation/auto_import_nextclade_mutations.R"]
+WORKDIR /app
+
+ENTRYPOINT ["Rscript", "./R/automation/auto_import_nextclade_mutations.R"]

@@ -26,4 +26,6 @@ COPY --from=builder /build/build/libs /app
 # Download geo location corrections list from Nextstrain
 RUN wget -O /app/gisaid_geoLocationRules.tsv https://raw.githubusercontent.com/nextstrain/ncov-ingest/master/source-data/gisaid_geoLocationRules.tsv
 
-ENTRYPOINT ["java", "-Xmx12g", "-jar", "/app/vineyard-1.0-SNAPSHOT.jar", "--config", "/config/config.yml", "GisaidApiImporter"]
+WORKDIR /app
+
+ENTRYPOINT ["java", "-Xmx12g", "-jar", "./vineyard-1.0-SNAPSHOT.jar", "--config", "/config/config.yml", "GisaidApiImporter"]
