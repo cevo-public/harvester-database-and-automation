@@ -1,0 +1,4 @@
+pyTest
+pyYAML
+PsycoPG2-binary
+Pandas

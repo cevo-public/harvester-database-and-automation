@@ -75,15 +75,6 @@ args = commandArgs(trailingOnly=TRUE)
 
 if (length(args) == 0 | args[1] == "install") {
 
-        out <- tryCatch(
-        {
-          message("Trying to install R packages in default library")
-          for (p in packages.default) {
-                install.packages(p)
-          }
-          for (p in packages.biocmanager) {
-                BiocManager::install(p)
-          }
 
         },
           error=install_on_error_or_warning

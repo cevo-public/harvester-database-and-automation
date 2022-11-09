@@ -1,6 +1,7 @@
 # Title     : Copy fastqs to droppoint that's synced with Viollier SFTP.
 # Objective : Fetch quality controlled sequences from database that don't have GISAID IDs assigned yet. Generate a fasta file and metadata file for these sequences for submission to SPSP.
 # Usage     : Called by the docker container spsp_transferer.
+# Maintainer: Matteo Carrara <carrara@nexus.ethz.ch>
 
 # TODO: automatically update improved sequences?
 # TODO: programatically fill in V-pipe version, sequencing methods, library prep kit to database - here the latter 2 are hardcoded to known truth as of 24.01.2022
@@ -124,10 +125,6 @@ get_samples_to_release <- function(db_connection, args) {
     select(sample_name, release_decision) %>%
     collect()
   all_db_seqs <- left_join(x = all_db_seqs, y = all_db_seqs_notes, by = "sample_name")
-  all_plates_mapping <- dplyr::tbl(db_connection, "test_plate_mapping") %>%
-    select(test_id, sequencing_plate, sequencing_plate_well) %>%
-    collect()
-  all_db_seqs <- left_join(x = all_db_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"), na_matches="never")
 
   print(log.info(
     msg = "Checking if batches are fully loaded into database.",
@@ -156,8 +153,8 @@ get_samples_to_release <- function(db_connection, args) {
     msg = "Checking if sequences have associated metadata in test_metadata.",
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
    has_test_metadata <- unlist(
-     dplyr::tbl(db_connection, "test_metadata") %>% select(test_id) %>% collect())
-   has_metadata <- all_db_seqs$test_id[(all_db_seqs$test_id %in% has_test_metadata)]
+     dplyr::tbl(db_connection, "test_metadata") %>% select(ethid) %>% collect())
+   has_metadata <- all_db_seqs$ethid[(all_db_seqs$ethid %in% has_test_metadata)]
 
   print(log.info(
     msg = "Annotating sequences in database with reasons not to release, if any.",
@@ -174,7 +171,7 @@ get_samples_to_release <- function(db_connection, args) {
         release_decision ~ "column release_decision in consensus_sequence is true",
         #TODO: check if I need to go with with TEST_ID
         ethid %in% released$ethid ~ "ethid already released or submitted",
-        !(test_id %in% has_metadata) ~ "no metadata in test_metadata",
+        !(ethid %in% has_metadata) ~ "no metadata in test_metadata",
         qc_result == "no fail reason" & is.na(ethid) ~ "null ethid",
         qc_result == "no fail reason" & duplicate_idx > 1 ~ "less complete duplicate",
         sample_name %in% seq_discrepencies$sample_name ~ "sequence discrepency between D-BSSE server and database",
@@ -183,17 +180,18 @@ get_samples_to_release <- function(db_connection, args) {
             sequencing_batch %in% incomplete_batches ~ "data from batch not completely loaded into database")) %>%
     ungroup()
 
-  #TODO: check if after mutating you can move on using the new fail_reason and warning reason
   fail_reason_summary <- summarize_fail_reasons(all_db_seqs_annotated)
   report_suspicious_batches(fail_reason_summary, args)
   report_null_ethids(all_db_seqs_annotated, args)
+  all_db_seqs_annotated <- report_controls_with_ethid(all_db_seqs_annotated, args)
 
   to_release <- all_db_seqs_annotated %>% filter(qc_result == "no fail reason")
+  to_release <- report_resequenced_samples(to_release, db_connection, args)
   print(log.info(
     msg = paste("Found", nrow(to_release), "sequences in database to release."),
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
   output <- list("samples" = to_release$sample_name, "summary" = fail_reason_summary)
-  print(output)
+  #print(output)
   return(output)
 }
 
@@ -266,6 +264,66 @@ report_null_ethids <- function(all_db_seqs_annotated, args) {
   }
 }
 
+# Remove and report any control with ETHID. This can happen if a lab sends out an internal ctrl for sequencing within their plate
+report_controls_with_ethid <- function(all_db_seqs_annotated, args) {
+  print(colnames(all_db_seqs_annotated))
+  sample_name <- all_db_seqs_annotated$sample_name
+  controls <- grep("control", sample_name, ignore.case = TRUE)
+  if(length(controls) > 0) {
+    print(notify.warn(
+      msg = paste0("Removing ", length(controls), " control samples with ethid: ", paste(controls, collapse=",")),
+      fcn = paste0(args$script_name, "::", "report_controls_with_ethid")))
+    non_ctrls <- grep("control", sample_name, ignore.case = TRUE, invert = TRUE)
+    return(all_db_seqs_annotated[non_ctrls,])
+  }
+}
+
+# Remove and report any sample that is a re-sequencing and has NOT been submitted already.
+# We still need to submit re-sequencing of non-submitted samples because in that case the new sample may be done to solve the failure reason
+report_resequenced_samples <- function(to_release, db_connection, args) {
+  involved_labs <- strsplit(x = read_yaml(file = args$config)[["involved_labs"]], split = " ")[[1]]
+  labs_meta <- NULL
+  for(i in 1:length(involved_labs)){
+      labs_meta <- rbind(labs_meta,dplyr::tbl(db_connection, paste0(involved_labs[i], "_metadata")) %>% select(ethid, sample_number) %>% collect())
+  }
+  submitted <- dplyr::tbl(db_connection, "sequence_identifier") %>% select(ethid, spsp_uploaded_at, gisaid_uploaded_at) %>% collect()
+  submitted <- left_join(submitted, labs_meta, by="ethid")
+  on_spsp <- which(!is.na(submitted$spsp_uploaded_at))
+  on_gisaid <- which(!is.na(submitted$gisaid_uploaded_at))
+  tmp <- unique(c(on_spsp, on_gisaid))
+  submitted <- submitted[tmp,]
+  to_release_sn <- left_join(to_release, labs_meta, by="ethid")
+  reseq <- to_release_sn[which(to_release_sn$sample_number%in%submitted$sample_number),]
+  to_release_no_reseq <- to_release_sn[which(!to_release_sn$sample_number%in%submitted$sample_number),]
+  print(log.info(
+    msg = paste0("Detected ", nrow(reseq), " resequencings already submitted and removed from the submission: ", paste(reseq$ethid, collapse=",")),
+    fcn = paste0(args$script_name, "::", "report_resequenced_samples")))
+    if(nrow(reseq)>0){ 
+      print(log.info(
+        msg = "Updating database to ignore the sequence and logging the reason",
+        fcn = paste0(args$script_name, "::", "report_resequenced_samples")))  
+      
+      new_notes = data.frame(sample_name = reseq$sample_name, release_decision = TRUE, comment = "Re-sequencing")
+
+      key_col <- c("sample_name")
+      table_spec <- parse_table_specification(
+        table_name <- "consensus_sequence_notes", db_connection = db_connection)
+      cols_to_update <- c("release_decision", "comment")
+
+      update_table(
+    table_name = "consensus_sequence_notes",
+    new_table = new_notes,
+        con = db_connection,
+    append_new_rows = T,
+    cols_to_update = cols_to_update,
+    key_col = key_col,
+    table_spec = table_spec,
+    run_summarize_update = T)
+    }
+  return(to_release_no_reseq)
+}
+
+
 #' Query database to assemble sequence metadata.
 get_sample_metadata <- function(db_connection, args, samples, raw_data_file_names) {
   print(log.info(
@@ -273,46 +331,72 @@ get_sample_metadata <- function(db_connection, args, samples, raw_data_file_name
     fcn = paste0(args$script_name, "::", "get_sample_metadata")))
   query_seqs <- dplyr::tbl(db_connection, "consensus_sequence") %>%
     filter(sample_name %in% !! samples) %>%
-    select(sample_name, sequencing_plate, sequencing_plate_well, sequencing_center, sequencing_batch) %>%
+    select(sample_name, sequencing_plate, sequencing_plate_well, sequencing_center, sequencing_batch, ethid) %>%
     collect()
   query_seqs_additional <- dplyr::tbl(db_connection, "consensus_sequence_meta") %>%
     select(sample_name, coverage_mean) %>%
     collect()
   query_seqs <- left_join(x = query_seqs, y = query_seqs_additional, by = "sample_name")
-  all_plates_mapping <- dplyr::tbl(db_connection, "test_plate_mapping") %>%
-    select(test_id, sequencing_plate, sequencing_plate_well) %>%
-    collect()
-  query_seqs <- left_join(x = query_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"),na_matches="never")
+#  all_plates_mapping <- dplyr::tbl(db_connection, "test_plate_mapping") %>%
+#    select(test_id, sequencing_plate, sequencing_plate_well) %>%
+#    collect()
+#  query_seqs <- left_join(x = query_seqs, y = all_plates_mapping, by = c("sequencing_plate", "sequencing_plate_well"),na_matches="never")
 
-  query_viollier <- dplyr::tbl(db_connection, "test_metadata") %>%  # join sequence data to sample metadata using test_id
-    select(ethid, test_id, order_date, zip_code, purpose) %>% collect()
-    query_viollier <- query_viollier %>% mutate(
-        covv_orig_lab = case_when(
-            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "viollier" ~ "Viollier AG",
-            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "team_w" ~ "labor team w AG"),
-        covv_orig_lab_addr = case_when(
-            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "viollier" ~ "Hagmattstrasse 14, 4123 Allschwil",
-            unlist(lapply(strsplit(query_viollier$test_id, "/"),function(x)x[1])) == "team_w" ~ "Blumeneggstrasse 55, 9403 Goldach")
-    ) %>%
-    collect()
-    query_viollier <- query_viollier %>% mutate(sample_number = gsub(test_id, pattern=".*/",replacement = "")) %>% collect()
+  ## "filter" with %in% does not work on data frame columns, so I need to use a temporary variable
+  ethid_to_release <- query_seqs$ethid
+  query_main_meta <- dplyr::tbl(db_connection, "test_metadata") %>%  # join sequence data to sample metadata using test_id
+    select(ethid, test_id, order_date, zip_code, purpose) %>% filter(ethid %in% ethid_to_release) %>% collect()
 
+  if(nrow(query_main_meta) != length(ethid_to_release)){
+    print(log.error(
+      msg = "FATAL: some samples are missing metadata in table test_metadata",
+      fcn = paste0(args$script_name, "::", "get_sample_metadata")))
+     stop()
+  }
 
-   join_viollier_w_reason <- left_join(x = query_seqs, y = query_viollier, by = "test_id")
-#   join_viollier <- left_join(x = query_seqs, y = query_viollier, by = "test_id")
-#  query_bag_sequence_report <- dplyr::tbl(db_connection, "bag_sequence_report") %>%
-#    select(auftraggeber_nummer, alt_seq_id, viro_purpose) %>% collect()
-#  join_viollier_w_reason <- left_join(  # merge in sequencing reason
-#    x = join_viollier,
-#    y = query_bag_sequence_report,
-#    by = c("sample_number" = "auftraggeber_nummer"))
+  query_imv <- dplyr::tbl(db_connection, "imv_metadata") %>% filter(ethid %in% ethid_to_release) %>% collect()
+  query_eoc <- dplyr::tbl(db_connection, "eoc_metadata") %>% filter(ethid %in% ethid_to_release) %>% collect()
+  query_viollier <- dplyr::tbl(db_connection, "viollier_metadata") %>% filter(ethid %in% ethid_to_release) %>% collect()
+  query_teamw <- dplyr::tbl(db_connection, "teamw_metadata") %>% filter(ethid %in% ethid_to_release) %>% collect()
+
+  # Check and report the number found for each lab
+       print(log.info(
+      msg = paste("Found:", nrow(query_eoc), "EOC samples;", nrow(query_imv), "IMV samples;", nrow(query_viollier), "Viollier samples;", nrow(query_teamw), "TeamW samples"),
+      fcn = paste0(args$script_name, "::", "get_sample_metadata")))
+
+  if((nrow(query_eoc) + nrow(query_imv) + nrow(query_viollier) + nrow(query_teamw) != length(ethid_to_release))){
+    print(log.error(
+      msg = "FATAL: some samples are missing lab-specific metadata in the respective <lab>_metadata table",
+      fcn = paste0(args$script_name, "::", "get_sample_metadata"))) 
+  }
+  
+  # Create a dictionary for assigning the sample name
+  tmp <- rbind(query_imv[,1:2], query_eoc[,1:2], query_teamw[,1:2], query_viollier[,1:2])
+  sample_number_dict <- tmp$sample_number
+  names(sample_number_dict) <- tmp$ethid
+
+  # Create and fill covv_orig_lab based on the lab of origin, to retrieve the lab_code_foph from the database
+  query_main_meta <- query_main_meta %>% mutate(
+    covv_orig_lab = case_when(
+      ethid %in% query_eoc$ethid ~ "EOC Bellinzona",
+      ethid %in% query_imv$ethid ~ "Institute of Medical Virology, University of Zurich",
+      ethid %in% query_teamw$ethid ~ "labor team w AG",
+      ethid %in% query_viollier$ethid ~ "Viollier AG"),
+    covv_orig_lab_addr = case_when(
+      ethid %in% query_eoc$ethid ~ "Via Mirasole 22/A, 6500 Bellinzona",
+      ethid %in% query_imv$ethid ~ "IMV",
+      ethid %in% query_teamw$ethid ~ "Blumeneggstrasse 55, 9403 Goldach",
+      ethid %in% query_viollier$ethid ~ "Hagmattstrasse 14, 4123 Allschwil"),
+    sample_number = recode(ethid, !!!sample_number_dict, .default = NA_character_)
+
+  ) %>% collect()
+
+  join_w_reason <- left_join(x = query_seqs, y = query_main_meta, by = "ethid")
 
   query_canton_code <- dplyr::tbl(db_connection, "swiss_postleitzahl") %>%  # get canton based on zip_code in metadata since canton is sometimes missing
     select(plz, canton) %>%
     rename(zip_code = plz) %>% collect()
-  join_canton <- left_join(x = join_viollier_w_reason, y = query_canton_code, by = "zip_code")
-
-  seq_metadata <- join_canton
+  seq_metadata <- left_join(x = join_w_reason, y = query_canton_code, by = "zip_code")
 
   seq_metadata <- seq_metadata %>% dplyr::left_join(
     y = dplyr::tbl(db_connection, "lab_code_foph") %>% collect(),
@@ -328,26 +412,31 @@ get_sample_metadata <- function(db_connection, args, samples, raw_data_file_name
     r1_files <- stack(raw_data_file_names$r1_files)
     names(r1_files) <- c("orig_fastq_name_forward", "sample_name")
     seq_metadata <- merge(x=seq_metadata, y=r1_files, by="sample_name", all.x=T)
-    seq_metadata$orig_fastq_name_forward[is.na(seq_metadata$orig_fastq_name_forward)] <- "to_assess"
+    seq_metadata$orig_fastq_name_forward[is.na(seq_metadata$orig_fastq_name_forward)] <- ""
+  }else{
+    seq_metadata$orig_fastq_name_forward <- ""
+    print(log.warn(
+      msg = "Warning: the metadata will have an empty field for the forward raw fastq files. Please manually upload an update with the raw data in the future",
+      fcn = paste0(args$script_name, "::", "get_sample_metadata")))
   }
-  else
-    seq_metadata$orig_fastq_name_forward <- "to_assess"
-
   if (length(raw_data_file_names$r2_files) > 0) {
     r2_files <- stack(raw_data_file_names$r2_files)
     names(r2_files) <- c("orig_fastq_name_reverse", "sample_name")
     seq_metadata <- merge(x=seq_metadata, y=r2_files, by="sample_name", all.x=T)
-    seq_metadata$orig_fastq_name_reverse[is.na(seq_metadata$orig_fastq_name_reverse)] <- "to_assess"
+    seq_metadata$orig_fastq_name_reverse[is.na(seq_metadata$orig_fastq_name_reverse)] <- ""
+  }else{
+    seq_metadata$orig_fastq_name_reverse <- ""
+    print(log.warn(
+      msg = "Warning: the metadata will have an empty field for the reverse raw fastq files. Please manually upload an update with the raw data in the future",
+      fcn = paste0(args$script_name, "::", "get_sample_metadata")))
   }
-  else
-    seq_metadata$orig_fastq_name_reverse <- "to_assess"
-
   metadata_w_canton <- merge(
     x = seq_metadata, y = canton_fullname, by = "canton", all.x = T)
 
   qcd_metadata <- qc_sample_metadata(metadata = metadata_w_canton, args)
   spsp_formatted_metadata <- format_metadata_for_spsp(metadata = qcd_metadata, args)
-  metadata <- check_mandatory_columns(metadata = spsp_formatted_metadata, args)
+  added_metadata <- insert_additional_metadata(spsp_formatted_metadata, args, db_connection)
+  metadata <- check_mandatory_columns(metadata = added_metadata, args)
   return(metadata)
 }
 
@@ -397,57 +486,118 @@ format_metadata_for_spsp <- function(metadata, args) {
      msg = "Formatting metadata for SPSP.",
      fcn = paste0(args$script_name, "::", "format_metadata_for_spsp")))
   seq_authors <- read_seq_authors(args)
+  #FIXME: temporary bug fix since the test_id are not correctly filled. It works, but it feels cleaner to use the short names
+  metadata$lab_short_name <- unlist(lapply(strsplit(metadata$test_id, "/"), function(x)x[1]))
+#
+#  metadata$authors = NULL
+#  for(i in 1:nrow(metadata)){
+#    if(metadata$lab_short_name[i] == "imv") { metadata$authors[i] = seq_authors$imv }
+#    if(metadata$lab_short_name[i] == "eoc") { metadata$authors[i] = seq_authors$eoc }
+#    if(metadata$lab_short_name[i] == "viollier") { metadata$authors[i] = seq_authors$viollier }
+#    if(metadata$lab_short_name[i] == "teamw") { metadata$authors[i] = seq_authors$teamw; message(i) }
+#    if(metadata$lab_short_name[i] != "imv" && metadata$lab_short_name[i] != "eoc" && metadata$lab_short_name[i] != "viollier" && metadata$lab_short_name[i] != "teamw"){
+#      print(log.error(
+#        msg = "FATAL: no lab short name found",
+#        fcn = paste0(args$script_name, "::", "format_metadata_for_spsp")))
+#      stop()
+#    }
+######FIXME! WARNING! PROBLEM! here I literally just say everyhing is from GFB, because we are missing this information and we know that, for now, this is true
+metadata$sequencing_center = "gfb"
+metadata$authors = NULL
+for(i in 1:nrow(metadata)){
+  if(metadata$covv_orig_lab[i] == "Institute of Medical Virology, University of Zurich") { metadata$authors[i] = seq_authors$imv }
+  if(metadata$covv_orig_lab[i] == "EOC Bellinzona") { metadata$authors[i] = seq_authors$eoc }
+  if(metadata$covv_orig_lab[i] == "labor team w AG") { metadata$authors[i] = seq_authors$teamw }
+  if(metadata$covv_orig_lab[i] == "Viollier AG") { metadata$authors[i] = seq_authors$viollier }
+
+  if(metadata$sequencing_center[i] == "viollier") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$viollier, sep=", ") }
+  if(metadata$sequencing_center[i] == "gfb") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$gfb, sep=", ") }
+  if(metadata$sequencing_center[i] == "h2030") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$h2030, sep=", ") }
+  if(metadata$sequencing_center[i] == "fgcz") { metadata$authors[i] = paste(metadata$authors[i], seq_authors$fgcz, sep=", ") }
+  metadata$authors[i] = paste(metadata$authors[i], seq_authors$ethz, sep=", ")
+ }
+  
+#  myauthors <- metadata %>%
+#    summarise(
+#      rep_authors = seq_authors$ethz,
+#      seq_authors = case_when(
+#        sequencing_center == "viollier" ~ seq_authors$viollier,
+#        sequencing_center == "gfb" ~ seq_authors$gfb,
+#        #sequencing_center == "h2030" ~ seq_authors$h2030,
+#        sequencing_center == "fgcz" ~ seq_authors$fgcz),
+#      col_authors = case_when(
+#        covv_orig_lab == "Institute of Medical Virology, University of Zurich" ~ seq_authors$imv,
+#        covv_orig_lab == "EOC Bellinzona" ~ seq_authors$eoc,
+#        covv_orig_lab == "Viollier AG" ~ seq_authors$viollier,
+#        covv_orig_lab == "labor team w AG" ~ seq_authors$teamw),
+#    )
+
+
   metadata_for_spsp <- metadata %>%
     summarise(
       orig_fasta_name = paste0(sample_name, ".fasta.gz"),
-      strain_name = paste(
-        "hCoV-19", "Switzerland", paste(canton, "ETHZ", ethid, sep = "-"),
-        lubridate::year(order_date), sep = "/"),
-      is_assembly_update = "No",
-      isolation_date = order_date,
-      location_general = case_when(
+      strain_name = case_when(
+        lab_short_name == "imv" ~ paste("hCoV-19", "Switzerland", paste(canton, "UZH-IMV", "PLACEHOLDER", sep = "-"),lubridate::year(order_date), sep="/"),
+        lab_short_name == "eoc" ~ paste("hCoV-19", "Switzerland", paste(canton, "EOC", ethid, sep="-"),lubridate::year(order_date), sep="/"),
+        lab_short_name == "viollier" ~ paste("hCoV-19", "Switzerland", paste(canton, "ETHZ", ethid, sep = "-"),lubridate::year(order_date), sep="/"),
+        lab_short_name == "teamw" ~ paste("hCoV-19", "Switzerland", paste(canton, "ETHZ", ethid, sep = "-"),lubridate::year(order_date), sep="/")
+    ),
+    
+    is_assembly_update = "No",
+    isolation_date = order_date,
+    location_general = case_when(
         is.na(canton_fullname) ~ paste("Europe", "Switzerland", sep = " / "),
-        T ~ paste("Europe", "Switzerland", canton_fullname, sep = " / ")),
-      isolation_source_description = "Human",
-      host_sex = "Unknown",
-      isolation_source_detailed = "Respiratory specimen",
-      sequencing_purpose = case_when(
-        purpose %in% c("surveillance", "Surveillance") & lab_name == "Viollier AG Allschwil\r" ~ "Surveillance",
-        purpose %in% c("diagnostic", "Diagnostic") & lab_name == "Viollier AG Allschwil\r" ~ "Unknown",
-        lab_name == "Labor team w AG, St. Gallen / Goldach\r" ~ "Surveillance",
-        viro_purpose %in% c("outbreak", "travel case", "screening") ~"Screening", # SPSP vocabulary distinguishes only between Screening, Clinical signs of infection, Re-infection, Infection after vaccination, Unknown, Other as of 27.05.21. As of May 2022 SPSP updated the vocabulary with Surveillance and Surveillance_FHOP, the latter referring to hospitalized patients
-        viro_purpose == "surveillance" ~ "Surveillance",
-        TRUE ~ "Other"),
-      library_preparation_kit = case_when(
-        sequencing_center == "viollier" ~ "Illumina_COVIDSeq (ARTIC V4)",
-        sequencing_center == "gfb" ~ "NEB (ARTIC V3)",
-        sequencing_center == "h2030" ~ "Illumina_COVIDSeq (ARTIC V4)",
-        sequencing_center == "fgcz" & as.Date(
-          gsub(sequencing_batch, pattern = "_.*", replacement = ""),
-          format = "%Y%m%d") < as.Date("2021-04-19") ~ "NEB",
-        sequencing_center == "fgcz" ~ "Nextera XT (ARTIC V4)"),
+        T ~ paste("Europe", "Switzerland", canton_fullname, sep = " / ")
+    ),
+
+    isolation_source_description = "Human",
+    host_sex = "Unknown",
+    host_age = "Unknown",
+    isolation_source_detailed = "Respiratory specimen",
+
+    library_preparation_kit = case_when(
+      sequencing_center == "viollier" ~ "Illumina_COVIDSeq (ARTIC V4)",
+      sequencing_center == "gfb" ~ "NEB (ARTIC V3)",
+      sequencing_center == "h2030" ~ "Illumina_COVIDSeq (ARTIC V4)",
+      sequencing_center == "fgcz" ~ "Nextera XT (ARTIC V4)",
+      sequencing_center == "fgcz" & as.Date(
+        gsub(sequencing_batch, pattern = "_.*", replacement = ""),
+        format = "%Y%m%d") < as.Date("2021-04-19") ~ "NEB"),
+
       sequencing_platform = "Combination Illumina MiSeq and Illumina NovaSeq 5000/6000",
+
       assembly_method = "V-pipe",
       raw_dataset_coverage = round(coverage_mean, digits = 0),
-      reporting_lab_name = "Department of Biosystems Science and Engineering, ETH Zürich; Mattenstrasse 26, 4058 Basel",
+
+      reporting_lab_name = case_when(
+        lab_short_name == "imv" ~ "Institute of Medical Virology, University of Zurich, Zurich, Switzerland / Department of Biosystems Science and Engineering, ETH Zürich; Mattenstrasse 26, 4058 Basel",
+        TRUE ~ "Department of Biosystems Science and Engineering, ETH Zürich; Mattenstrasse 26, 4058 Basel"),
+
       reporting_lab_order_id = sample_name,
       collecting_lab_name = paste(covv_orig_lab, covv_orig_lab_addr, sep = "; "),
       collecting_lab_code = lab_code_foph,
       collecting_lab_order_id = sample_number,
+
       sequencing_lab_name = case_when(
         sequencing_center == "gfb" ~ "Genomic Facility Basel",
         sequencing_center %in% c("fgcz", "fcgz") ~ "Functional Genomics Center Zurich",
         sequencing_center == "h2030" ~ "H2030 Genome Center",
         sequencing_center == "viollier" ~ "Viollier AG"),
-      reporting_authors = case_when(
-        covv_orig_lab == "labor team w AG" ~ seq_authors$fgcz_teamw,
-        sequencing_center == "gfb" ~ seq_authors$gfb,
-        sequencing_center %in% c("fgcz", "fcgz") ~ seq_authors$fgcz_viollier,
-        sequencing_center == "h2030" ~ seq_authors$h2030,
-        sequencing_center == "viollier" ~ seq_authors$viollier),
+
+      reporting_authors = authors,
+      sequencing_purpose = purpose,
+
       orig_fastq_name_forward = orig_fastq_name_forward,
       orig_fastq_name_reverse = orig_fastq_name_reverse,
+ 
+      #This column indicates if we are submitting on behalf of someone else. At the time of writing (July 29th 2022), only IMV and EOC requested a "on_behalf" submission. The content of the column is communicated to us by SPSP. The last communication was on July 8th 2022
+      on_behalf = case_when(
+        lab_short_name == "imv" ~ "UZH-MedVir",
+        lab_short_name == "eoc" ~ "EOC-LM"
+      )
+
     )
+
   rownames(metadata_for_spsp) <- metadata$sample_name
   return(metadata_for_spsp)
 }
@@ -459,6 +609,48 @@ read_seq_authors <- function(args) {
        fcn = paste0(args$script_name, "::", "read_seq_authors")))
   seq_authors <- read_yaml(file = args$config)
   return(seq_authors$authors)
+}
+
+# Add the information that labs send to us manually
+insert_additional_metadata <- function(metadata, args, db_connection){
+  involved_labs <- strsplit(x = read_yaml(file = args$config)[["involved_labs"]], split = " ")[[1]]
+  labs_meta <- list()
+  ethids <- unlist(lapply(strsplit(metadata$reporting_lab_order_id, "--"), function(x)x[1]))
+
+  for(i in 1:length(involved_labs)){
+    if(involved_labs[i] == "teamw"){next()}
+    if(involved_labs[i] == "eoc"){next()}
+    if(involved_labs[i] == "viollier"){next()}
+    if(involved_labs[i] == "imv"){
+      labs_meta[[i]] <- dplyr::tbl(db_connection, paste0(involved_labs[i], "_metadata")) %>% filter(ethid %in% ethids) %>% collect()
+      if(nrow(labs_meta[[i]]) == 0){
+        print(log.info(
+        msg = paste("Found no IMV samples with additional metadata in imv_metadata. This should happen only if there are no IMV samples for today", args$config),
+        fcn = paste0(args$script_name, "::", "insert_additional_metadata")))
+        next()
+      }
+        for(k in 1:nrow(labs_meta[[i]])){
+          meta_row_index <- which(ethids %in% labs_meta[[i]]$ethid[k])
+      
+          for(m in 1:ncol(labs_meta[[i]])){
+            if(colnames(labs_meta[[i]])[m] %in% c("ethid", "sample_number")){next()}
+            if(colnames(labs_meta[[i]])[m] == "sample_name_anonymised"){
+              new_strain <- metadata$strain_name[meta_row_index]
+              new_strain <- unlist(strsplit(new_strain, "/"))
+              tmp_strain <- unlist(strsplit(new_strain[3], "-"))
+              tmp_strain[4] <- labs_meta[[i]][k,m]
+              tmp_strain <- paste0(tmp_strain, collapse = "-")
+              new_strain <- paste(new_strain[1], new_strain[2], tmp_strain, new_strain[4], sep = "/")
+              metadata$strain_name[meta_row_index] <- new_strain
+            }else{
+              meta_col_index <- which(colnames(metadata) %in% colnames(labs_meta[[i]])[m])
+              metadata[meta_row_index, meta_col_index] <- labs_meta[[i]][k,m]
+            }
+          }
+        }
+    }
+  }
+  return(metadata)
 }
 
 # Check if missing any mandatory metadata.
@@ -534,6 +726,8 @@ get_frameshift_diagnostics <- function(db_connection, metadata, args) {
 
   frameshifts_tbl <- frameshifts_tbl %>%
     mutate(indel_position_english = tidyr::replace_na(data = indel_position_english, replace = "no frameshifts found in this sequence"))
+
+  frameshifts_tbl <- frameshifts_tbl[,which(colnames(frameshifts_tbl)!="sample_name")]
   return(frameshifts_tbl)
 }
 
