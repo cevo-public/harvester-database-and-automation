@@ -1,6 +1,6 @@
 attrs==20.3.0
 bcbio-gff==0.6.6
-biopython==1.78
+biopython
 certifi==2020.12.5
 chardet==4.0.0
 configparser==5.0.1

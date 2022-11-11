@@ -10,6 +10,7 @@ RUN \
     && apt-get -y --no-install-recommends install \
         cifs-utils \
         python3 \
+        python3-dev \
         python3-pip \
         r-base \
         r-base-dev \
