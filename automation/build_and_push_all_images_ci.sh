@@ -9,6 +9,7 @@ for component in bag_meldeformular_importer \
     owid_global_cases_importer \
     pangolin_lineage_importer \
     gisaid_api_importer \
+    viollier_metadata_receiver \
     java; do
     echo .
     echo .
