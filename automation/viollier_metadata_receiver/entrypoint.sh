@@ -25,5 +25,5 @@ mkdir -p "/mnt/$DIR2"
 mount -v -t davfs $POLYBOX_PATH "/mnt/$DIR2"
 echo "$POLYBOX_PATH /mnt/$DIR2"
 # Execute program
-python3 /app/database/python/viollier/viollier_metadata_receiver.py
+python3 /app/viollier_metadata_receiver.py
 umount.davfs "/mnt/$DIR2"
