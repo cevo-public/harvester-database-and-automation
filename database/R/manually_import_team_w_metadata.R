@@ -1,11 +1,14 @@
 # Title     : Manually import team w metadata
-# Objective : This script imports metadata (from the same file sent to FGCZ) for labor team w samples for which we already recieved sequences. It will also assign ETHIDs to the samples.
+# Objective : This script imports metadata (from the same file Andreas sends to FGCZ) for labor team w samples for which we already recieved sequences. It will also assign ETHIDs to the samples.
+# Created by: nadeaus
 # Created on: 18.08.21
 
 require(dplyr)
 source("R/utility.R")
-source("R/secrets.R")
 db_connection <- open_database_connection("server")
+
+# Load team w metadata from the files they send to FGCZ
+metadata_dir <- ""
 
 #' Read in team w metadata.
 load_metadata <- function(file) {
@@ -56,7 +59,7 @@ load_revised_metadata <- function(file) {
 }
 
 is_first <- T
-for (file in list.files(path = team_w_metadata_dir, full.names = T)) {
+for (file in list.files(path = metadata_dir, full.names = T)) {
   print(paste("Reading metadata from", file))
   if (is_first) {
     metadata <- load_metadata(file)
@@ -79,9 +82,11 @@ sample_names <- dplyr::tbl(db_connection, "consensus_sequence") %>%
   select(sample_name, sequencing_batch) %>%
   collect()
 
-team_w_plate_name_lab_order_id_pattern <- "Y21[[:digit:]]{7}_2021[[:digit:]]{4}_21[[:digit:]]{8}_" 
-#OLD Ex: 2108028604_Y######### from 2108028604_Y#########_32033_S87
-#NEW Ex: Y#########_20210920_2109208604 from Y#########_20210920_2109208604_S17
+team_w_plate_name_lab_order_id_pattern <- "Y22[[:digit:]]{7}"
+#team_w_plate_name_lab_order_id_pattern <- "Y21[[:digit:]]{7}_2021[[:digit:]]{4}_21[[:digit:]]{8}_" 
+#OLD Ex: 2108028604_Y210959950 from 2108028604_Y210959950_32033_S87
+#NEW Ex: Y211178764_20210920_2109208604 from Y211178764_20210920_2109208604_S17
+#NEW Ex 12Dec: Y211643907
 
 sample_names_parsed <- sample_names %>%
   mutate(
@@ -93,12 +98,20 @@ sample_names_parsed <- sample_names %>%
     extra = "drop",
     fill = "right") %>%
   filter(!is.na(LabOrderId)) %>%
-  select(sample_name, sequencing_batch, PlateName, LabOrderId)
+#  select(sample_name, sequencing_batch, PlateName, LabOrderId)
+  select(sample_name, sequencing_batch, LabOrderId)
+
+#metadata_to_sample_name <- base::merge(
+#  x = metadata,
+#  y = sample_names_parsed,
+#  by = c("PlateName", "LabOrderId"),
+#  all.x = T,
+#  all.y = F)
 
 metadata_to_sample_name <- base::merge(
   x = metadata,
   y = sample_names_parsed,
-  by = c("PlateName", "LabOrderId"),
+  by = c("LabOrderId"),
   all.x = T,
   all.y = F)
 
@@ -119,21 +132,23 @@ if (any(!(n_sequences_per_plate$n_sequences_matched %in% c(0, 93)))) {
 }
 
 # Clean the metadata for the sequences
-key_col = "sample_name"
-cols_to_update <- c("order_date", "zip_code", "covv_orig_lab", "covv_orig_lab_addr", "sample_number")
+key_col = "test_id"
+cols_to_update <- c("order_date", "zip_code", "sample_number")
 
 metadata_to_import <- metadata_to_sample_name %>%
   filter(!is.na(sample_name)) %>%
-  rename(zip_code = PLZ) %>%
   mutate(
     covv_orig_lab = "labor team w AG",
-    covv_orig_lab_addr = "Blumeneggstrasse 55, 9403 Goldach") %>%
+    covv_orig_lab_addr = "Blumeneggstrasse 55, 9403 Goldach",
+    sample_name = paste0("teamw/", sample_name)) %>%
+  rename(zip_code = PLZ) %>%
+  rename(test_id = sample_name) %>%
   select(all_of(c(key_col, cols_to_update)))
 
 # Import the metadata for the sequences to non_viollier_test
-table_spec <- parse_table_specification(table_name = "non_viollier_test", db_connection = db_connection)
+table_spec <- parse_table_specification(table_name = "test_metadata", db_connection = db_connection)
 update_table(
-  table_name = "non_viollier_test",
+  table_name = "test_metadata",
   new_table = metadata_to_import,
   con = db_connection,
   cols_to_update = cols_to_update,
@@ -141,14 +156,28 @@ update_table(
   table_spec = table_spec)
 
 # Assign team w samples with metadata ETHIDs
-consensus_sequence_query <- paste(
-  "select cs.sample_name, ethid, sequencing_batch, number_n",
-  "from consensus_sequence cs",
-  "right join non_viollier_test nvt on cs.sample_name = nvt.sample_name",
-  "where nvt.covv_orig_lab = 'labor team w AG'",
-  "and ethid is null;")
+test_metadata_query <- dplyr::tbl(db_connection, "test_metadata") %>%
+  select(test_id, order_date, zip_code, canton, city, is_positive, purpose, comment) %>% collect()
+test_metadata_query <- test_metadata_query %>%
+  mutate(sample_name = gsub(test_id, pattern=".*/",replacement = ""),
+         lab = gsub(test_id, pattern="/.*",replacement = "")) %>%
+  mutate( sample_name = case_when(
+         lab == "team_w" ~ paste0("Y",sample_name)
+  )) %>% collect()
+consensus_sequence_query <- dplyr::tbl(db_connection, "consensus_sequence") %>%
+  select(sample_name, ethid, sequencing_batch) %>% collect()
+consensus_sequence_query <- left_join(consensus_sequence_query, test_metadata_query, by="sample_name")
+consensus_sequence_exerpt <- consensus_sequence_query %>% filter(is.na(ethid), lab=="team_w") %>% collect()
 
-consensus_sequence_exerpt <- DBI::dbGetQuery(conn = db_connection, statement = consensus_sequence_query)
+
+#consensus_sequence_query <- paste(
+#  "select cs.sample_name, ethid, sequencing_batch, number_n",
+#  "from consensus_sequence cs",
+#  "right join test_metadata on cs.sample_name = tm.sample_name",
+#  "where tm.covv_orig_lab = 'labor team w AG'",
+#  "and ethid is null;")
+#
+#consensus_sequence_exerpt <- DBI::dbGetQuery(conn = db_connection, statement = consensus_sequence_query)
 
 do_update <- F
 if (nrow(consensus_sequence_exerpt) %% 93 != 0) {
@@ -186,6 +215,14 @@ if (do_update) {
     con = db_connection,
     cols_to_update = "ethid",
     key_col = c("sample_name", "sequencing_batch"),
+    table_spec = table_spec)
+  table_spec <- parse_table_specification(table_name = "test_metadata", db_connection = db_connection)
+  update_table(
+    table_name = "test_metadata",
+    new_table = consensus_sequence_to_import,
+    con = db_connection,
+    cols_to_update = "ethid",
+    key_col = c("test_id"),
     table_spec = table_spec)
 }
 

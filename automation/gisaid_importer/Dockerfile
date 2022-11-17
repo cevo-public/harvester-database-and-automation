@@ -1,30 +1,18 @@
-FROM rocker/tidyverse:4.0.3
-WORKDIR /app/
-
-# Update packages
-RUN apt-get update && apt-get -y upgrade
-
-# Install R packages
-COPY database/R/install_packages.R R/
-RUN Rscript R/install_packages.R
+FROM registry.ethz.ch/sars_cov_2/s3c/harvester-database-and-automation:base_image_r_and_python
 
 # Install nextclade
-RUN apt-get install -y curl
 RUN curl -sL https://deb.nodesource.com/setup_lts.x | bash -
-RUN apt-get install -y nodejs
 RUN npm install --global @neherlab/nextclade
 
 # Install mafft
-RUN wget https://mafft.cbrc.jp/alignment/software/mafft_7.475-1_amd64.deb
-RUN dpkg -i mafft_7.475-1_amd64.deb
-RUN rm mafft_7.475-1_amd64.deb
-RUN which mafft
+RUN wget https://mafft.cbrc.jp/alignment/software/mafft_7.475-1_amd64.deb \
+    && dpkg -i mafft_7.475-1_amd64.deb \
+    && rm mafft_7.475-1_amd64.deb \
+    && which mafft
 
-COPY database/ .
-COPY reference.fasta .
-COPY align_splits.sh .
-COPY insert_data.sh .
-COPY nextclade_splits.sh .
-RUN chmod +x align_splits.sh nextclade_splits.sh
+COPY reference.fasta align_splits.sh insert_data.sh nextclade_splits.sh /app
+RUN chmod +x /app/align_splits.sh /app/nextclade_splits.sh
 
-ENTRYPOINT cd /app && Rscript R/automation/auto_import_gisaid.R --main
+WORKDIR /app
+
+ENTRYPOINT ["Rscript", "R/automation/auto_import_gisaid.R", "--main"]

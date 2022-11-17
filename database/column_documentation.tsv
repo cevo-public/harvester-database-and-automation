@@ -68,7 +68,7 @@ variant_mutation	aa_mutation	"The mutation in the Nextclade format. Examples: ""
 viollier_plate		Viollier's plates containing both substance of positive and negative tests
 viollier_plate	viollier_plate_name	Plate names set by Viollier. They have usually the format <day><month><year>eg<number> or <day><month><year>wuhan<number>. The name is stored as lower case.
 viollier_plate	gfb_number	"The name a plate gets when it is shipped to the Genomics Facility Basel. As of 11.06.2021 full plates no longer get renamed, so a ""-"" in this column after this date just indicates a plate was sent to GFB. Another change was implemented 22.06.21 where we switch from writing into this column to sequencing_center. This column will not be updated thereafter."
-viollier_plate	fgcz_name	"The name a plate gets when it is shipped to the Functional Genomics Center Zurich. As of 11.06.2021 full plates no longer get renamed, so a ""-"" in this column after this date just indicates a plate was sent to FGCZ. Another change was implemented 22.06.21 where we switch from writing into this column to sequencing_center. This column will not be updated thereafter."
+viollier_plate	fgcname	"The name a plate gets when it is shipped to the Functional Genomics Center Zurich. As of 11.06.2021 full plates no longer get renamed, so a ""-"" in this column after this date just indicates a plate was sent to FGCZ. Another change was implemented 22.06.21 where we switch from writing into this column to sequencing_center. This column will not be updated thereafter."
 viollier_plate	sequencing_center	"Where the plate was sent for sequencing, or whether it stayed at Viollier for in-house sequencing."
 viollier_plate	left_viollier_date	The date when a plate was shipped to a genomic facility. It was introduced in October and is not set for earlier entries.
 viollier_plate	has_no_extract	The plate was run on a BioRad CFX machine without producing a highly purified RNA extract.
@@ -179,110 +179,110 @@ billing_report_team_w	gisaid_submitted_but_not_confirmed	Number of 'sequenced' s
 billing_report_team_w	gisaid_confirmed_upload	Number of 'sequenced' samples that have been submitted (i.e. have an entry in sequence_identifier) and have a GISAID_EPI_ISL associated.
 billing_report_team_w	submitted_to_GISAID	Total number of sequences submitted to GISAID; sum of 'gisaid_submitted_but_not_confirmed' and 'gisaid_confirmed_upload'.
 billing_report_team_w	submitted_to_GISAID_percentage	Fraction of 'sequenced' samples submitted to GISAID; 'submitted_to_GISAID' divided by 'sequenced'.
-z_test_metadata		Information about (positive and negative) COVID-19 PCR tests
-z_test_metadata	test_id	A Swiss-wide unique identifier for a test. It has the format `<lab name>/<Laborauftragsnummer>`.
-z_test_metadata	ethid	"A unique number defined by us. It has to be defined for all samples that we sequence. This number will be added to the ""strain"" name that we submit to public databases."
-z_test_metadata	order_date	The date on which the lab received the order. We expect it to be the same as the sampling date.
-z_test_metadata	canton	The canton of sampling or of the office of the doctor.
-z_test_metadata	zip_code	The zip code of sampling or of the office of the doctor.
-z_test_metadata	city	The city of sampling or of the office of the doctor.
-z_test_metadata	is_positive	Whether a test is positive
-z_test_metadata	comment	Additional information as free text
-z_extraction_plate		Information about plates produced by the originating labs containing RNA extracts and sent to the sequencing centers
-z_extraction_plate	extraction_plate_id	A Swiss-wide unique identifier for an extraction plate. It has the format `<lab name>/<plate name given by the lab>`.
-z_extraction_plate	gfb_number	"The name a plate gets when it is shipped to the Genomics Facility Basel. As of 11.06.2021 full plates no longer get renamed, so a ""-"" in this column after this date just indicates a plate was sent to GFB. Another change was implemented 22.06.21 where we switch from writing into this column to sequencing_center. This column will not be updated thereafter"
-z_extraction_plate	fgcz_name	"The name a plate gets when it is shipped to the Functional Genomics Center Zurich. As of 11.06.2021 full plates no longer get renamed, so a ""-"" in this column after this date just indicates a plate was sent to FGCZ. Another change was implemented 22.06.21 where we switch from writing into this column to sequencing_center. This column will not be updated thereafter."
-z_extraction_plate	health2030	A boolean indicating whether a plate was shipped to Health 2030. Another change was implemented 22.06.21 where we switch from writing into this column to sequencing_center. This column will not be updated thereafter.
-z_extraction_plate	left_lab_or_received_metadata_date	"Originally, it was the date when a plate was shipped to a genomic facility. It was introduced in October 2020 and is not set for earlier entries. Since June 2021, we don't necessarily know the exact date when a plate was shipped but rather insert the date when we received the metadata."
-z_extraction_plate	sequencing_center	"Where the plate was sent for sequencing, or whether it stayed at Viollier for in-house sequencing."
-z_extraction_plate	viollier_extract_free	"A boolean indicating whether this plate is from Viollier and ""extract free"". Extract free plates should contain the RNA material but are not purified. So far, we have not been able to generate sequences from those plates."
-z_extraction_plate	comment	Additional information as free text
-z_sequencing_plate		Information about plates that goes into the sequencers. They may be equivalent to the extraction plates.
-z_sequencing_plate	sequencing_plate_id	A unique identifier for a sequencing plate.
-z_sequencing_plate	sequencing_center	The genomic facility that sequenced the plate
-z_sequencing_plate	sequencing_date	The date of sequencing
-z_sequencing_plate	comment	Additional information as free text
-z_test_plate_mapping		"A mapping between test_metadata, extraction_plate and sequencing_plate"
-z_test_plate_mapping	test_id	As defined in test_metadata
-z_test_plate_mapping	old_sample	"A sample that left Viollier before 07 June 2021 is considered as old. We have some wrong mappings in the old data: for example, we have multiple tests mapped to the same plate and well. For the new data (i.e., old_sample=false), we will prevent this by enforcing a uniqueness of plate-well combinations in this table."
-z_test_plate_mapping	extraction_plate	As defined in extraction_plate
-z_test_plate_mapping	extraction_plate_well	The well position on the extraction plate
-z_test_plate_mapping	extraction_e_gene_ct	"As of 11.06.2021 Viollier only provides a single CT value, which is written into this column."
-z_test_plate_mapping	extraction_rdrp_gene_ct	The RdRp gene CT
-z_test_plate_mapping	sequencing_plate	As defined in sequencing_plate
-z_test_plate_mapping	sequencing_plate_well	The well position on the sequencing plate
-z_test_plate_mapping	sample_type	"The sample type. Valid values are ""clinical"", ""empty"", ""positive control"", ""negative control"", and ""wastewater""."
-z_consensus_sequence		The generated consensus sequences
-z_consensus_sequence	sample_name	Name given to the sequenced material (ultimately assigned by the sequencing center)
-z_consensus_sequence	sequencing_plate	As defined in sequencing_plate
-z_consensus_sequence	sequencing_plate_well	The well position on the sequencing plate
-z_consensus_sequence	insert_date	The date when we first insert the sequence
-z_consensus_sequence	update_date	The date when we update the sequence
-z_consensus_sequence	sequencing_center	The genomic facility that did the sequencing
-z_consensus_sequence	sequencing_batch	The V-Pipe sequencing batch name
-z_consensus_sequence	seq_aligned	The aligned version of the sequence
-z_consensus_sequence	seq_unaligned	The unaligned version of the sequence
-z_consensus_sequence	ethid	ETH identifier for a sample.
-z_consensus_sequence_meta		Information that are derived from or related to a consensus sequence. This includes QC values and lineage information.
-z_consensus_sequence_meta	sample_name	As defined in consensus_sequence
-z_consensus_sequence_meta	references	-
-z_consensus_sequence_meta	coverage_mean	-
-z_consensus_sequence_meta	r1_basequal	-
-z_consensus_sequence_meta	r2_basequal	-
-z_consensus_sequence_meta	rejreads	-
-z_consensus_sequence_meta	alnreads	-
-z_consensus_sequence_meta	insertsize	-
-z_consensus_sequence_meta	consensus_n	-
-z_consensus_sequence_meta	qc_result	"The summarized result. The column was formerly called ""fail_reason""."
-z_consensus_sequence_meta	diagnostic_divergence	-
-z_consensus_sequence_meta	diagnostic_excess_divergence	-
-z_consensus_sequence_meta	diagnostic_number_n	-
-z_consensus_sequence_meta	diagnostic_number_gaps	-
-z_consensus_sequence_meta	diagnostic_clusters	-
-z_consensus_sequence_meta	diagnostic_gaps	-
-z_consensus_sequence_meta	diagnostic_all_snps	-
-z_consensus_sequence_meta	diagnostic_flagging_reason	-
-z_consensus_sequence_meta	nextclade_clade	-
-z_consensus_sequence_meta	nextclade_qc_overall_score	-
-z_consensus_sequence_meta	nextclade_qc_overall_status	-
-z_consensus_sequence_meta	nextclade_total_gaps	-
-z_consensus_sequence_meta	nextclade_total_insertions	-
-z_consensus_sequence_meta	nextclade_total_missing	-
-z_consensus_sequence_meta	nextclade_total_mutations	-
-z_consensus_sequence_meta	nextclade_total_non_acgtns	-
-z_consensus_sequence_meta	nextclade_total_pcr_primer_changes	-
-z_consensus_sequence_meta	nextclade_alignment_start	-
-z_consensus_sequence_meta	nextclade_alignment_end	-
-z_consensus_sequence_meta	nextclade_alignment_score	-
-z_consensus_sequence_meta	nextclade_qc_missing_data_score	-
-z_consensus_sequence_meta	nextclade_qc_missing_data_status	-
-z_consensus_sequence_meta	nextclade_qc_missing_data_total	-
-z_consensus_sequence_meta	nextclade_qc_mixed_sites_score	-
-z_consensus_sequence_meta	nextclade_qc_mixed_sites_status	-
-z_consensus_sequence_meta	nextclade_qc_mixed_sites_total	-
-z_consensus_sequence_meta	nextclade_qc_private_mutations_cutoff	-
-z_consensus_sequence_meta	nextclade_qc_private_mutations_excess	-
-z_consensus_sequence_meta	nextclade_qc_private_mutations_score	-
-z_consensus_sequence_meta	nextclade_qc_private_mutations_status	-
-z_consensus_sequence_meta	nextclade_qc_private_mutations_total	-
-z_consensus_sequence_meta	nextclade_qc_snp_clusters_clustered	-
-z_consensus_sequence_meta	nextclade_qc_snp_clusters_score	-
-z_consensus_sequence_meta	nextclade_qc_snp_clusters_status	-
-z_consensus_sequence_meta	nextclade_qc_snp_clusters_total	-
-z_consensus_sequence_meta	nextclade_errors	-
-z_consensus_sequence_meta	pango_lineage	-
-z_consensus_sequence_meta	pango_probability	-
-z_consensus_sequence_meta	pango_learn_version	-
-z_consensus_sequence_meta	pango_status	-
-z_consensus_sequence_meta	pango_note	-
-z_consensus_sequence_mutation_aa		The amino acid mutations of a sequence
-z_consensus_sequence_mutation_aa	sample_name	As defined in consensus_sequence
-z_consensus_sequence_mutation_aa	aa_mutation	An amino acid mutation
-z_consensus_sequence_mutation_nucleotide		The nucleotide mutations of a sequence
-z_consensus_sequence_mutation_nucleotide	sample_name	As defined in consensus_sequence
-z_consensus_sequence_mutation_nucleotide	nuc_mutation	A nucleotide mutation
-z_consensus_sequence_notes		Manually curated notes about sequences
-z_consensus_sequence_notes	sample_name	As defined in consensus_sequence
-z_consensus_sequence_notes	release_decision	"Can be used to manually override ""qc_result"""
-z_consensus_sequence_notes	purpose	A specific reason for sequencing
-z_consensus_sequence_notes	comment	Additional information as free text
+test_metadata		Information about (positive and negative) COVID-19 PCR tests
+test_metadata	test_id	A Swiss-wide unique identifier for a test. It has the format `<lab name>/<Laborauftragsnummer>`.
+test_metadata	ethid	"A unique number defined by us. It has to be defined for all samples that we sequence. This number will be added to the ""strain"" name that we submit to public databases."
+test_metadata	order_date	The date on which the lab received the order. We expect it to be the same as the sampling date.
+test_metadata	canton	The canton of sampling or of the office of the doctor.
+test_metadata	zip_code	The zip code of sampling or of the office of the doctor.
+test_metadata	city	The city of sampling or of the office of the doctor.
+test_metadata	is_positive	Whether a test is positive
+test_metadata	comment	Additional information as free text
+extraction_plate		Information about plates produced by the originating labs containing RNA extracts and sent to the sequencing centers
+extraction_plate	extraction_plate_id	A Swiss-wide unique identifier for an extraction plate. It has the format `<lab name>/<plate name given by the lab>`.
+extraction_plate	gfb_number	"The name a plate gets when it is shipped to the Genomics Facility Basel. As of 11.06.2021 full plates no longer get renamed, so a ""-"" in this column after this date just indicates a plate was sent to GFB. Another change was implemented 22.06.21 where we switch from writing into this column to sequencing_center. This column will not be updated thereafter"
+extraction_plate	fgcname	"The name a plate gets when it is shipped to the Functional Genomics Center Zurich. As of 11.06.2021 full plates no longer get renamed, so a ""-"" in this column after this date just indicates a plate was sent to FGCZ. Another change was implemented 22.06.21 where we switch from writing into this column to sequencing_center. This column will not be updated thereafter."
+extraction_plate	health2030	A boolean indicating whether a plate was shipped to Health 2030. Another change was implemented 22.06.21 where we switch from writing into this column to sequencing_center. This column will not be updated thereafter.
+extraction_plate	left_lab_or_received_metadata_date	"Originally, it was the date when a plate was shipped to a genomic facility. It was introduced in October 2020 and is not set for earlier entries. Since June 2021, we don't necessarily know the exact date when a plate was shipped but rather insert the date when we received the metadata."
+extraction_plate	sequencing_center	"Where the plate was sent for sequencing, or whether it stayed at Viollier for in-house sequencing."
+extraction_plate	viollier_extract_free	"A boolean indicating whether this plate is from Viollier and ""extract free"". Extract free plates should contain the RNA material but are not purified. So far, we have not been able to generate sequences from those plates."
+extraction_plate	comment	Additional information as free text
+sequencing_plate		Information about plates that goes into the sequencers. They may be equivalent to the extraction plates.
+sequencing_plate	sequencing_plate_id	A unique identifier for a sequencing plate.
+sequencing_plate	sequencing_center	The genomic facility that sequenced the plate
+sequencing_plate	sequencing_date	The date of sequencing
+sequencing_plate	comment	Additional information as free text
+test_plate_mapping		"A mapping between test_metadata, extraction_plate and sequencing_plate"
+test_plate_mapping	test_id	As defined in test_metadata
+test_plate_mapping	old_sample	"A sample that left Viollier before 07 June 2021 is considered as old. We have some wrong mappings in the old data: for example, we have multiple tests mapped to the same plate and well. For the new data (i.e., old_sample=false), we will prevent this by enforcing a uniqueness of plate-well combinations in this table."
+test_plate_mapping	extraction_plate	As defined in extraction_plate
+test_plate_mapping	extraction_plate_well	The well position on the extraction plate
+test_plate_mapping	extraction_e_gene_ct	"As of 11.06.2021 Viollier only provides a single CT value, which is written into this column."
+test_plate_mapping	extraction_rdrp_gene_ct	The RdRp gene CT
+test_plate_mapping	sequencing_plate	As defined in sequencing_plate
+test_plate_mapping	sequencing_plate_well	The well position on the sequencing plate
+test_plate_mapping	sample_type	"The sample type. Valid values are ""clinical"", ""empty"", ""positive control"", ""negative control"", and ""wastewater""."
+consensus_sequence		The generated consensus sequences
+consensus_sequence	sample_name	Name given to the sequenced material (ultimately assigned by the sequencing center)
+consensus_sequence	sequencing_plate	As defined in sequencing_plate
+consensus_sequence	sequencing_plate_well	The well position on the sequencing plate
+consensus_sequence	insert_date	The date when we first insert the sequence
+consensus_sequence	update_date	The date when we update the sequence
+consensus_sequence	sequencing_center	The genomic facility that did the sequencing
+consensus_sequence	sequencing_batch	The V-Pipe sequencing batch name
+consensus_sequence	seq_aligned	The aligned version of the sequence
+consensus_sequence	seq_unaligned	The unaligned version of the sequence
+consensus_sequence	ethid	ETH identifier for a sample.
+consensus_sequence_meta		Information that are derived from or related to a consensus sequence. This includes QC values and lineage information.
+consensus_sequence_meta	sample_name	As defined in consensus_sequence
+consensus_sequence_meta	references	-
+consensus_sequence_meta	coverage_mean	-
+consensus_sequence_meta	r1_basequal	-
+consensus_sequence_meta	r2_basequal	-
+consensus_sequence_meta	rejreads	-
+consensus_sequence_meta	alnreads	-
+consensus_sequence_meta	insertsize	-
+consensus_sequence_meta	consensus_n	-
+consensus_sequence_meta	qc_result	"The summarized result. The column was formerly called ""fail_reason""."
+consensus_sequence_meta	diagnostic_divergence	-
+consensus_sequence_meta	diagnostic_excess_divergence	-
+consensus_sequence_meta	diagnostic_number_n	-
+consensus_sequence_meta	diagnostic_number_gaps	-
+consensus_sequence_meta	diagnostic_clusters	-
+consensus_sequence_meta	diagnostic_gaps	-
+consensus_sequence_meta	diagnostic_all_snps	-
+consensus_sequence_meta	diagnostic_flagging_reason	-
+consensus_sequence_meta	nextclade_clade	-
+consensus_sequence_meta	nextclade_qc_overall_score	-
+consensus_sequence_meta	nextclade_qc_overall_status	-
+consensus_sequence_meta	nextclade_total_gaps	-
+consensus_sequence_meta	nextclade_total_insertions	-
+consensus_sequence_meta	nextclade_total_missing	-
+consensus_sequence_meta	nextclade_total_mutations	-
+consensus_sequence_meta	nextclade_total_non_acgtns	-
+consensus_sequence_meta	nextclade_total_pcr_primer_changes	-
+consensus_sequence_meta	nextclade_alignment_start	-
+consensus_sequence_meta	nextclade_alignment_end	-
+consensus_sequence_meta	nextclade_alignment_score	-
+consensus_sequence_meta	nextclade_qc_missing_data_score	-
+consensus_sequence_meta	nextclade_qc_missing_data_status	-
+consensus_sequence_meta	nextclade_qc_missing_data_total	-
+consensus_sequence_meta	nextclade_qc_mixed_sites_score	-
+consensus_sequence_meta	nextclade_qc_mixed_sites_status	-
+consensus_sequence_meta	nextclade_qc_mixed_sites_total	-
+consensus_sequence_meta	nextclade_qc_private_mutations_cutoff	-
+consensus_sequence_meta	nextclade_qc_private_mutations_excess	-
+consensus_sequence_meta	nextclade_qc_private_mutations_score	-
+consensus_sequence_meta	nextclade_qc_private_mutations_status	-
+consensus_sequence_meta	nextclade_qc_private_mutations_total	-
+consensus_sequence_meta	nextclade_qc_snp_clusters_clustered	-
+consensus_sequence_meta	nextclade_qc_snp_clusters_score	-
+consensus_sequence_meta	nextclade_qc_snp_clusters_status	-
+consensus_sequence_meta	nextclade_qc_snp_clusters_total	-
+consensus_sequence_meta	nextclade_errors	-
+consensus_sequence_meta	pango_lineage	-
+consensus_sequence_meta	pango_probability	-
+consensus_sequence_meta	pango_learn_version	-
+consensus_sequence_meta	pango_status	-
+consensus_sequence_meta	pango_note	-
+consensus_sequence_mutation_aa		The amino acid mutations of a sequence
+consensus_sequence_mutation_aa	sample_name	As defined in consensus_sequence
+consensus_sequence_mutation_aa	aa_mutation	An amino acid mutation
+consensus_sequence_mutation_nucleotide		The nucleotide mutations of a sequence
+consensus_sequence_mutation_nucleotide	sample_name	As defined in consensus_sequence
+consensus_sequence_mutation_nucleotide	nuc_mutation	A nucleotide mutation
+consensus_sequence_notes		Manually curated notes about sequences
+consensus_sequence_notes	sample_name	As defined in consensus_sequence
+consensus_sequence_notes	release_decision	"Can be used to manually override ""qc_result"""
+consensus_sequence_notes	purpose	A specific reason for sequencing
+consensus_sequence_notes	comment	Additional information as free text

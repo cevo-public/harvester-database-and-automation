@@ -1,13 +1,4 @@
-FROM rocker/tidyverse:4.0.3
-WORKDIR /app/
+FROM registry.ethz.ch/sars_cov_2/s3c/harvester-database-and-automation:base_image_r_and_python
 
-# Update packages
-RUN apt-get update && apt-get -y upgrade
-
-# Install R packages
-COPY database/R/install_packages.R R/
-RUN Rscript R/install_packages.R
-
-COPY database/ .
-
-ENTRYPOINT Rscript R/automation/auto_owid_global_cases_importer.R
+WORKDIR /app
+ENTRYPOINT ["Rscript", "./R/automation/auto_owid_global_cases_importer.R"]

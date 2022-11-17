@@ -5,10 +5,11 @@ WORKDIR /app/
 COPY pangolin/environment.yml /pangolin/environment.yml
 RUN conda env create -f /pangolin/environment.yml
 COPY pangolin/ /pangolin/
-SHELL ["conda", "run", "-n", "pangolin", "/bin/bash", "-c"]
-RUN cd /pangolin && python setup.py install
-RUN ["conda", "run", "--no-capture-output", "-n", "pangolin", "pangolin", "--update"]
+RUN ls -l
+RUN ls -l /pangolin
 
+RUN /opt/conda/bin/conda run -n pangolin python -m pip install /pangolin
+RUN /opt/conda/bin/conda run -n pangolin pangolin --update
 
 # Prepare base python
 COPY requirements.txt .

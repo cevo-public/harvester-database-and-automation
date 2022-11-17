@@ -1,11 +1,9 @@
 ## Build app ##
 
-FROM openjdk:15 AS builder
-WORKDIR /build/
+FROM openjdk:15-slim AS builder
 
-COPY database/java/ .
-RUN chmod +x ./gradlew
-RUN ./gradlew clean build -x test
+COPY database/java/ /build/
+RUN cd /build && chmod +x gradlew && ./gradlew clean build -x test && ls -l /build/*
 
 
 ## Run server ##
@@ -15,4 +13,4 @@ WORKDIR /app
 
 COPY --from=builder /build/build/libs /app
 
-ENTRYPOINT ["java", "-Xmx12g", "-jar", "/app/vineyard-1.0-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-Xmx12g", "-jar", "./vineyard-1.0-SNAPSHOT.jar"]

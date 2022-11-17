@@ -39,11 +39,12 @@ public class SpspExporter extends SubProgram<EmptyConfig> {
     }
 
 
-    private String runSpspFileExporter(Path config, Path samplesetdir, Path outdir) throws IOException, InterruptedException {
+    private String runSpspFileExporter(Path config, Path samplesetdir, Path outdir, Path workingdir) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder("/usr/local/bin/Rscript", "/app/R/export_spsp_submission.R",
                 "--config", config.toAbsolutePath().toString(),
                 "--samplesetdir", samplesetdir.toAbsolutePath().toString(),
-                "--outdir", outdir.toAbsolutePath().toString());
+                "--outdir", outdir.toAbsolutePath().toString(),
+                "--workingdir", workingdir.toAbsolutePath().toString());
         Process SpspFileExporterProcess = pb.start();
         List<String> SpspFileExporterInputLines = new ArrayList<>();
         StreamGobbler SpspFileExporterGobbler = new StreamGobbler(SpspFileExporterProcess.getInputStream(), SpspFileExporterInputLines::add);
@@ -155,7 +156,8 @@ public class SpspExporter extends SubProgram<EmptyConfig> {
             String exportFilesReport = runSpspFileExporter(
                     Path.of("spsp-config.yml"),
                     Path.of(args[0]), // samplesetdir
-                    Path.of(args[1]) // outdir
+                    Path.of(args[1]), // outdir
+                    Path.of(args[2])  // workingdir
             );
             SimpleReport sendableReport = new SimpleReport(exportFilesReport, "SpspExporter",
                     SendableReport.PriorityLevel.INFO);

@@ -1,28 +1,12 @@
-FROM rocker/tidyverse:4.0.3
-WORKDIR /app/
+FROM registry.ethz.ch/sars_cov_2/s3c/harvester-database-and-automation:base_image_r_and_python
 
-# Update packages
-RUN apt-get update && apt-get -y upgrade
+# clone nextstrain/ncov repository
+RUN git clone https://github.com/nextstrain/ncov.git /app/python/ncov/
+RUN cd /app/python/ncov && git checkout 76d9d30dc196ecbbb24650605573ad2eef486081 && cd ../..
 
-# Install R packages
-COPY database/R/install_packages.R R/
-RUN Rscript R/install_packages.R
+COPY entrypoint.sh requirements.txt /app
+RUN chmod +x /app/entrypoint.sh && pip3 install -r /app/requirements.txt
 
-# Install package for mounting a smb cifs drive
-RUN apt-get install -y cifs-utils
+WORKDIR /app
 
-# Prepare python
-RUN apt-get install -y python3 python3-pip
-COPY database/python/requirements.txt python/
-RUN pip3 install -r python/requirements.txt
-
-# Clone nextstrain/ncov repository
-RUN git clone https://github.com/nextstrain/ncov.git python/ncov/
-RUN cd python/ncov && git checkout 76d9d30dc196ecbbb24650605573ad2eef486081 && cd ../..
-
-COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
-
-COPY database/ .
-
-ENTRYPOINT ["bash", "entrypoint.sh"]
+ENTRYPOINT ["bash", "./entrypoint.sh"]

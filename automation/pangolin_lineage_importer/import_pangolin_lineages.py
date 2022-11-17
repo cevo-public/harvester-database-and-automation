@@ -24,11 +24,11 @@ def import_lineages(db_host, db_name, db_user, db_password):
     fetch_sql = """
         select
           cs.sample_name,
-          cs.seq
+          cs.seq_unaligned
         from
-          consensus_sequence_nextclade_data nd
-          join consensus_sequence cs on nd.sample_name = cs.sample_name
-        where nd.pangolin_status is null
+          consensus_sequence_meta csm
+          join consensus_sequence cs on csm.sample_name = cs.sample_name
+        where csm.pango_status is null
         limit 2000;
     """
     with conn.cursor() as cursor:
@@ -49,12 +49,12 @@ def import_lineages(db_host, db_name, db_user, db_password):
     # Write pangolin results into the database
     number_inserted = 0
     insert_sql = """
-        update consensus_sequence_nextclade_data
+        update consensus_sequence_meta
         set
-          pangolin_lineage = %s,
-          pangolin_learn_version = %s,
-          pangolin_status = %s,
-          pangolin_note = %s
+          pango_lineage = %s,
+          pango_learn_version = %s,
+          pango_status = %s,
+          pango_note = %s
         where sample_name = %s;
     """
     with open('/wkdir/lineage_report.csv', newline='') as f:

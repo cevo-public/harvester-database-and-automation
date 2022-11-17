@@ -7,6 +7,7 @@ create table z_test_metadata (
   canton text,
   city text,
   is_positive boolean not null,
+  purpose text,
   comment text
 );
 
@@ -149,6 +150,5 @@ create table z_consensus_sequence_notes (
   sample_name text primary key
     references z_consensus_sequence (sample_name) on update cascade on delete cascade,
   release_decision boolean,
-  purpose text,
   comment text
 );

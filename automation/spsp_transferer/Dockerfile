@@ -22,7 +22,7 @@ RUN apt-get update && apt-get -y upgrade
 RUN apt-get install -y netcat #nc command
 RUN apt-get install -y gpg #gpg command
 RUN apt-get install -y openssh-client #sftp command
-RUN apt-get install -y curl  # for testing IP address
+RUN apt-get update && apt-get install -y curl  # for testing IP address
 
 # Install package for mounting a smb cifs drive
 RUN apt-get install -y cifs-utils
@@ -54,4 +54,4 @@ COPY transfer.sh /app/transfer.sh
 RUN chmod +x /app/transfer.sh
 
 # Run script to generate and submit submission files
-ENTRYPOINT ["java", "-Xmx12g", "-jar", "/app/vineyard-1.0-SNAPSHOT.jar", "SpspExporter", "/mnt/pangolin/sampleset", "/app/outdir"]
+ENTRYPOINT ["java", "-Xmx12g", "-jar", "/app/vineyard-1.0-SNAPSHOT.jar", "SpspExporter", "/mnt/pangolin/sampleset", "/app/outdir", "/mnt/pangolin/working"]
