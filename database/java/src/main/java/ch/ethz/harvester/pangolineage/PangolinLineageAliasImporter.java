@@ -37,7 +37,6 @@ public class PangolinLineageAliasImporter extends SubProgram<PangolinLineageAlia
                 looper.sleep();
             }
         } catch (Throwable e) {
-            notificationSystem.sendReport(new ProgramCrashReport(e, "PangolinLineageAliasImporter"));
             e.printStackTrace();
             System.exit(1);
         }
