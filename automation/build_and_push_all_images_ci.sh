@@ -1,9 +1,10 @@
 #!/bin/sh
 set -eu
 
-for component in bag_meldeformular_importer \
+for component in \
+    bag_meldeformular_importer \
     bag_meldeformular_dashboard_importer \
-    consensus_sequence_importer \
+    sequence_diagnostic_importer \
     gisaid_importer \
     nextclade_importer \
     owid_global_cases_importer \

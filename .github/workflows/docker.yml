@@ -37,7 +37,7 @@ jobs:
           docker build -t $IMAGE_NAME:bag_meldeformular_importer automation/bag_meldeformular_importer/
           docker push $IMAGE_NAME:bag_meldeformular_importer
 
-  consensus_sequence_importer:
+  sequence_diagnostic_importer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -45,9 +45,9 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
       - name: Add tags and push
         run: |
-          cp -r database automation/consensus_sequence_importer/database
-          docker build -t $IMAGE_NAME:consensus_sequence_importer automation/consensus_sequence_importer/
-          docker push $IMAGE_NAME:consensus_sequence_importer
+          cp -r database automation/sequence_diagnostic_importer/database
+          docker build -t $IMAGE_NAME:sequence_diagnostic_importer automation/sequence_diagnostic_importer/
+          docker push $IMAGE_NAME:sequence_diagnostic_importer
 
   nextclade_importer:
     runs-on: ubuntu-latest

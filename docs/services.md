@@ -22,11 +22,11 @@ Because Chaoran was too lazy to create another image, the BAG meldeformular impo
 **Gotchas:** Not all the outputs of the programs are redirected to stdout/stderr so that some log and error messages might not appear in the log files.
 
 
-### Consensus Sequence Importer (automated part)
+### Sequence Diagnostic Importer (automated part)
 
-Different than the name suggests, the consensus sequence importer that is still running on the server does not import the consensus sequences (anymore). It imports QC scores.
+Imports QC scores.
 
-**Image name:** ghcr.io/cevo-public/harvester:consensus_sequence_importer
+**Image name:** ghcr.io/cevo-public/harvester:sequence_diagnostic_importer
 
 **Dependencies:** It needs access to the `covid19-pangolin` drive.
 
