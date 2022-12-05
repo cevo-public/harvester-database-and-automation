@@ -1,12 +1,18 @@
+# Define pipeline stages. They will run in the order defined here.
 stages:
-  - prepare
-  - build_and_push_base_image
-  - build_and_push
+  - prepare_artifacts
+  - build_base_image
+  - build_components
 
 
-prepare:
-    stage: prepare
+# Download external dependencies and provide them as artifacts to later stages.
+# This job (and therefore stage) is only executed when a new Git tag is
+# created, just like the subsequent stages.
+prepare_artifacts:
+    stage: prepare_artifacts
     image: ubuntu:latest
+    rules:
+      - if: $CI_COMMIT_TAG
     script:
       - apt update
       - apt install -y git wget
@@ -17,44 +23,42 @@ prepare:
       - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh --quiet -O miniconda3.sh
       - bash ./miniconda3.sh -b -p ./miniconda3
       - pwd
-
     artifacts:
         paths:
             - ./pangolin
             - ./transfer-tool
-              # - ./miniconda3
-              #
-build-base:
-    stage: build_and_push_base_image
+
+
+# Build the Docker image that most components are based on.
+build_base_image:
+    stage: build_base_image
     image:
         name: gcr.io/kaniko-project/executor:debug
         entrypoint: [""]
     dependencies:
-      - prepare
+      - prepare_artifacts
+    rules:
+      - if: $CI_COMMIT_TAG
     script:
-        - mkdir -p /kaniko/.docker
-        - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"},\"$CI_DEPENDENCY_PROXY_SERVER\":{\"auth\":\"$(printf "%s:%s" ${CI_DEPENDENCY_PROXY_USER} "${CI_DEPENDENCY_PROXY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
         - cp -R database automation/base_image_r_and_python
-        - >
-             /kaniko/executor --context ${CI_PROJECT_DIR}
-             --dockerfile ${CI_PROJECT_DIR}/automation/base_image_r_and_python/Dockerfile
-             --destination $CI_REGISTRY_IMAGE:base_image_r_and_python
-             --cache=true
-             --cache-ttl=720h  # one month
-    dependencies:
-      - prepare
+        - /kaniko/executor
+          --context ${CI_PROJECT_DIR}
+          --dockerfile ${CI_PROJECT_DIR}/automation/base_image_r_and_python/Dockerfile
+          --destination $CI_REGISTRY_IMAGE:base_image_r_and_python
 
 
-build-container:
-    stage: build_and_push
+# Build the Docker images for the individual components (micro-services).
+# We retry the image build a second time if it fails, as Kaniko is
+# sometimes a bit fragile.
+build_components:
+    stage: build_components
     image:
         name: gcr.io/kaniko-project/executor:debug
         entrypoint: [""]
     dependencies:
-      - prepare
+      - prepare_artifacts
+    rules:
+      - if: $CI_COMMIT_TAG
     script:
-        - mkdir -p /kaniko/.docker
-        - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"},\"$CI_DEPENDENCY_PROXY_SERVER\":{\"auth\":\"$(printf "%s:%s" ${CI_DEPENDENCY_PROXY_USER} "${CI_DEPENDENCY_PROXY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
-        - cd automation
-        - ./build_and_push_all_images_ci.sh
-    retry: 1  # kaniko is sometimes a bit fragile
+        - ./.gitlab/build_components.sh
+    retry: 1
