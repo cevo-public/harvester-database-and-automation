@@ -198,7 +198,7 @@ get_sample_names_without_nextclade <- function (db_connection) {
   sql <- "
     select csm.sample_name
     from consensus_sequence_meta csm
-    where csm.nextclade_qc_overall_score is null and csm.nextclade_errors != '\"Unable to align: no seed matches\"'
+    where csm.nextclade_qc_overall_score is null and csm.nextclade_errors is null
     order by random()
     limit 5000;
   "
