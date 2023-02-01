@@ -83,6 +83,8 @@ update_sequence_identifier <- function(db_connection, metadata, args) {
     filter(sample_name %in% !! rownames(metadata)) %>%
     select(ethid, sample_name) %>%
     collect()
+  strains <- data.frame(sample_name=rownames(metadata), strain_name=metadata[,which(colnames(metadata)=="strain_name")])
+  newly_uploaded <- left_join(newly_uploaded, strains)
   joined_table <- coalesce_join(
     x = newly_uploaded %>%
       mutate(spsp_uploaded_at = Sys.Date()),
