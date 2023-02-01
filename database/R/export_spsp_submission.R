@@ -25,7 +25,10 @@ main <- function(args) {
   if (length(db_output$samples) > 0) {
     config <- read_yaml(file = args$config)
     raw_data_file_names <- upload_raw_data_files(db_output$samples, date, config$raw_data_upload)
-    metadata <- get_sample_metadata(db_connection, args, db_output$samples, raw_data_file_names)
+    metadata_list <- get_sample_metadata(db_connection, args, db_output$samples, raw_data_file_names)
+    new_notes <- rbind(db_output$new_notes, metadata_list$new_notes)
+    write_new_notes(db_connection, new_notes)
+    metadata <- metadata_list$metadata
     frameshifts_tbl <- get_frameshift_diagnostics(db_connection, metadata, args)
     write_out_files(metadata, frameshifts_tbl, db_output$summary, db_connection, args)
   } else {
@@ -188,9 +191,9 @@ get_samples_to_release <- function(db_connection, args) {
   to_release <- all_db_seqs_annotated %>% filter(qc_result == "no fail reason")
   to_release <- report_resequenced_samples(to_release, db_connection, args)
   print(log.info(
-    msg = paste("Found", nrow(to_release), "sequences in database to release."),
+    msg = paste("Found", nrow(to_release[[1]]), "sequences in database to release."),
     fcn = paste0(args$script_name, "::", "get_samples_to_release")))
-  output <- list("samples" = to_release$sample_name, "summary" = fail_reason_summary)
+  output <- list("samples" = data.frame(sample_name=to_release[[1]]$sample_name, ethid=to_release[[1]]$ethid, is_reseq=to_release[[1]]$is_reseq, first_submit_ethid=to_release[[1]]$first_submit_ethid), "summary" = fail_reason_summary, "new_notes" = to_release[[2]])
   #print(output)
   return(output)
 }
@@ -288,39 +291,61 @@ report_resequenced_samples <- function(to_release, db_connection, args) {
   }
   submitted <- dplyr::tbl(db_connection, "sequence_identifier") %>% select(ethid, spsp_uploaded_at, gisaid_uploaded_at) %>% collect()
   submitted <- left_join(submitted, labs_meta, by="ethid")
-  on_spsp <- which(!is.na(submitted$spsp_uploaded_at))
-  on_gisaid <- which(!is.na(submitted$gisaid_uploaded_at))
-  tmp <- unique(c(on_spsp, on_gisaid))
-  submitted <- submitted[tmp,]
+  #on_spsp <- which(!is.na(submitted$spsp_uploaded_at))
+  #on_gisaid <- which(!is.na(submitted$gisaid_uploaded_at))
+  #tmp <- unique(c(on_spsp, on_gisaid))
+  #submitted <- submitted[tmp,]
   to_release_sn <- left_join(to_release, labs_meta, by="ethid")
-  reseq <- to_release_sn[which(to_release_sn$sample_number%in%submitted$sample_number),]
-  to_release_no_reseq <- to_release_sn[which(!to_release_sn$sample_number%in%submitted$sample_number),]
+
+
+  cons_meta <- dplyr::tbl(db_connection, "consensus_sequence_meta") %>% select("sample_name","consensus_n") %>% collect()
+  cons <- dplyr::tbl(db_connection, "consensus_sequence") %>% select("ethid","sample_name") %>% collect()
+  to_release_sn$is_reseq <- FALSE
+  to_release_sn$is_reseq[which(to_release_sn$sample_number%in%submitted$sample_number)] <- TRUE
+  to_release_sn_final <- NULL
+  to_ignore <- NULL
+  for(i in 1:nrow(to_release_sn)){
+      if(to_release_sn$is_reseq[i]){
+          if(is.na(to_release_sn$sample_number[i])){
+            to_ignore <- rbind(to_ignore, to_release_sn[i,])
+            next()
+          }
+          first_submit_ethid <- submitted$ethid[which(submitted$sample_number%in%to_release_sn$sample_number[i])]
+          first_submit <- cons[which(cons$ethid%in%first_submit_ethid),]
+          first_submit <- left_join(first_submit, cons_meta)
+          first_submit <- first_submit[which(first_submit$consensus_n == min(first_submit$consensus_n)),]
+
+          if(to_release_sn$consensus_n[i]/min(first_submit$consensus_n) < 0.9){
+              myline <- to_release_sn[i,]
+              myline$first_submit_ethid <- first_submit_ethid
+              to_release_sn_final <- rbind(to_release_sn_final, myline)
+          }else{
+              to_ignore <- rbind(to_ignore, to_release_sn[i,])
+          }
+      }else{
+          myline <- to_release_sn[i,]
+          myline$first_submit_ethid <- NA
+          to_release_sn_final <- rbind(to_release_sn_final, myline)
+      }
+  }
+ 
+
   print(log.info(
-    msg = paste0("Detected ", nrow(reseq), " resequencings already submitted and removed from the submission: ", paste(reseq$ethid, collapse=",")),
+    msg = paste0("Detected ",length(to_release_sn$is_reseq), " resequencings. Of them, ",length(to_release_sn_final$is_reseq), "are at least 10% better in quality (#Ns in the consensus) and will be submitted as an update: "),
     fcn = paste0(args$script_name, "::", "report_resequenced_samples")))
-    if(nrow(reseq)>0){ 
+
+
+
+    if(!is.null(to_ignore)){ 
       print(log.info(
-        msg = "Updating database to ignore the sequence and logging the reason",
+        msg = "Updating database to ignore the worse-quality resequencing and logging the reason",
         fcn = paste0(args$script_name, "::", "report_resequenced_samples")))  
       
-      new_notes = data.frame(sample_name = reseq$sample_name, release_decision = TRUE, comment = "Re-sequencing")
-
-      key_col <- c("sample_name")
-      table_spec <- parse_table_specification(
-        table_name <- "consensus_sequence_notes", db_connection = db_connection)
-      cols_to_update <- c("release_decision", "comment")
-
-      update_table(
-    table_name = "consensus_sequence_notes",
-    new_table = new_notes,
-        con = db_connection,
-    append_new_rows = T,
-    cols_to_update = cols_to_update,
-    key_col = key_col,
-    table_spec = table_spec,
-    run_summarize_update = T)
+      new_notes = data.frame(sample_name = to_ignore$sample_name, release_decision = TRUE, comment = "discarded re-sequencing (worse qc or NA sample_number")
+    }else{
+       new_notes = NULL
     }
-  return(to_release_no_reseq)
+  return(list(to_release_sn_final, new_notes))
 }
 
 
@@ -330,7 +355,7 @@ get_sample_metadata <- function(db_connection, args, samples, raw_data_file_name
     msg = "Querying database for sample metadata.",
     fcn = paste0(args$script_name, "::", "get_sample_metadata")))
   query_seqs <- dplyr::tbl(db_connection, "consensus_sequence") %>%
-    filter(sample_name %in% !! samples) %>%
+    filter(sample_name %in% !! samples$sample_name) %>%
     select(sample_name, sequencing_plate, sequencing_plate_well, sequencing_center, sequencing_batch, ethid) %>%
     collect()
   query_seqs_additional <- dplyr::tbl(db_connection, "consensus_sequence_meta") %>%
@@ -433,10 +458,13 @@ get_sample_metadata <- function(db_connection, args, samples, raw_data_file_name
   metadata_w_canton <- merge(
     x = seq_metadata, y = canton_fullname, by = "canton", all.x = T)
 
-  qcd_metadata <- qc_sample_metadata(metadata = metadata_w_canton, args)
+  metadata_w_reseq <- left_join(metadata_w_canton, samples)
+
+  qcd_metadata <- qc_sample_metadata(metadata = metadata_w_reseq, args)
   spsp_formatted_metadata <- format_metadata_for_spsp(metadata = qcd_metadata, args)
   added_metadata <- insert_additional_metadata(spsp_formatted_metadata, args, db_connection)
-  metadata <- check_mandatory_columns(metadata = added_metadata, args)
+  ovverridden_metadata <- override_strain_names_update(added_metadata, args, db_connection, samples)
+  metadata <- check_mandatory_columns(metadata = overridden_metadata, args)
   return(metadata)
 }
 
@@ -486,23 +514,7 @@ format_metadata_for_spsp <- function(metadata, args) {
      msg = "Formatting metadata for SPSP.",
      fcn = paste0(args$script_name, "::", "format_metadata_for_spsp")))
   seq_authors <- read_seq_authors(args)
-  #FIXME: temporary bug fix since the test_id are not correctly filled. It works, but it feels cleaner to use the short names
   metadata$lab_short_name <- unlist(lapply(strsplit(metadata$test_id, "/"), function(x)x[1]))
-#
-#  metadata$authors = NULL
-#  for(i in 1:nrow(metadata)){
-#    if(metadata$lab_short_name[i] == "imv") { metadata$authors[i] = seq_authors$imv }
-#    if(metadata$lab_short_name[i] == "eoc") { metadata$authors[i] = seq_authors$eoc }
-#    if(metadata$lab_short_name[i] == "viollier") { metadata$authors[i] = seq_authors$viollier }
-#    if(metadata$lab_short_name[i] == "teamw") { metadata$authors[i] = seq_authors$teamw; message(i) }
-#    if(metadata$lab_short_name[i] != "imv" && metadata$lab_short_name[i] != "eoc" && metadata$lab_short_name[i] != "viollier" && metadata$lab_short_name[i] != "teamw"){
-#      print(log.error(
-#        msg = "FATAL: no lab short name found",
-#        fcn = paste0(args$script_name, "::", "format_metadata_for_spsp")))
-#      stop()
-#    }
-######FIXME! WARNING! PROBLEM! here I literally just say everyhing is from GFB, because we are missing this information and we know that, for now, this is true
-metadata$sequencing_center = "gfb"
 metadata$authors = NULL
 for(i in 1:nrow(metadata)){
   if(metadata$covv_orig_lab[i] == "Institute of Medical Virology, University of Zurich") { metadata$authors[i] = seq_authors$imv }
@@ -517,22 +529,6 @@ for(i in 1:nrow(metadata)){
   metadata$authors[i] = paste(metadata$authors[i], seq_authors$ethz, sep=", ")
  }
   
-#  myauthors <- metadata %>%
-#    summarise(
-#      rep_authors = seq_authors$ethz,
-#      seq_authors = case_when(
-#        sequencing_center == "viollier" ~ seq_authors$viollier,
-#        sequencing_center == "gfb" ~ seq_authors$gfb,
-#        #sequencing_center == "h2030" ~ seq_authors$h2030,
-#        sequencing_center == "fgcz" ~ seq_authors$fgcz),
-#      col_authors = case_when(
-#        covv_orig_lab == "Institute of Medical Virology, University of Zurich" ~ seq_authors$imv,
-#        covv_orig_lab == "EOC Bellinzona" ~ seq_authors$eoc,
-#        covv_orig_lab == "Viollier AG" ~ seq_authors$viollier,
-#        covv_orig_lab == "labor team w AG" ~ seq_authors$teamw),
-#    )
-
-
   metadata_for_spsp <- metadata %>%
     summarise(
       orig_fasta_name = paste0(sample_name, ".fasta.gz"),
@@ -543,7 +539,10 @@ for(i in 1:nrow(metadata)){
         lab_short_name == "teamw" ~ paste("hCoV-19", "Switzerland", paste(canton, "ETHZ", ethid, sep = "-"),lubridate::year(order_date), sep="/")
     ),
     
-    is_assembly_update = "No",
+    is_assembly_update = case_when(
+        is_reseq == TRUE ~ "yes",
+        is_reseq == FALSE ~ "no"
+    ),    
     isolation_date = order_date,
     location_general = case_when(
         is.na(canton_fullname) ~ paste("Europe", "Switzerland", sep = " / "),
@@ -651,6 +650,54 @@ insert_additional_metadata <- function(metadata, args, db_connection){
     }
   }
   return(metadata)
+}
+
+# If a sample needs to be updated, do not create a new strain name based on the 
+override_strain_names_update <- function(metadata, args, db_connection, samples){
+    metadata <- left_join(metadata, samples, by=c("reporting_lab_order_id" = "sample_name"))
+    seqid <- dplyr::tbl(db_connection, "sequence_identifier") %>% select("ethid", "strain_name") %>% collect()
+    cons <- dplyr::tbl(db_connection, "consensus_sequence") %>% select("ethid","sample_name") %>% collect()
+    metadata <- left_join(metadata,cons, by=c("first_submit_ethid"="ethid"),na_matches="never")
+    new_cons_notes <- NULL
+    for(i in 1:nrow(metadata)){
+        if(metadata$is_reseq[i]){
+		original_strain_name <- seqid$strain_name[which(seqid$ethid==metadata$first_submit_ethid[i])]
+		if(is.na(original_strain_name)){
+                    stop("ERROR: original strain name not set. Please correct in the database")
+                }
+		or_canton <- unlist(lapply(strsplit(original_strain_name, "/"), function(x)x[3]))
+                or_canton <- unlist(lapply(strsplit(or_canton,"-"),function(x)x[1]))
+                cur_canton <- unlist(lapply(strsplit(metadata$strain_name[i], "/"), function(x)x[3]))
+                cur_canton <- unlist(lapply(strsplit(cur_canton,"-"),function(x)x[1]))
+                if(or_canton != cur_canton){
+                    stop("ERROR: canton doesn't match in strain name between the original sequence and the resequencing")
+                }
+                metadata$strain_name[i]<-original_strain_name
+                new_cons_notes <- rbind(new_cons_notes,data.frame(sample_name=metadata$sample_name[i], release_decision=TRUE, comment=paste0("better quality resequencing available: ", metadata$ethid[i])))
+        }
+        
+    }
+    metadata <- metadata[,which(!colnames(metadata)%in%c("ethid","is_reseq","first_submit_ethid","sample_name"))]
+    return(list("metadata"=metadata,"new_notes"=new_cons_notes))
+
+}
+
+write_new_notes <- function(db_connection, new_notes){
+      key_col <- c("sample_name")
+      table_spec <- parse_table_specification(
+        table_name <- "consensus_sequence_notes", db_connection = db_connection)
+      cols_to_update <- c("release_decision", "comment")
+    
+      update_table(
+    table_name = "consensus_sequence_notes",
+    new_table = new_notes,
+        con = db_connection, 
+    append_new_rows = T,
+    cols_to_update = cols_to_update,
+    key_col = key_col,
+    table_spec = table_spec,
+    run_summarize_update = T)
+
 }
 
 # Check if missing any mandatory metadata.
