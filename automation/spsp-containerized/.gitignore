@@ -1,7 +1,0 @@
-*.sif
-*.img
-*.tar.gz
-
-.env
-.outbox
-logs
