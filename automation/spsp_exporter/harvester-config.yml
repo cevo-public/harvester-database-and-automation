@@ -1,0 +1,8 @@
+senderSmtpHost: domain.tld
+senderSmtpPort: 587
+senderSmtpUsername: account
+senderSmtpPassword: "***************"
+senderAddress: account@domain.tld
+recipients:
+  - name1@domain1
+  - name2@domain2
