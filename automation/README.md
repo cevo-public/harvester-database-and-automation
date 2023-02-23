@@ -8,7 +8,7 @@ To run the Docker images with Singularity, they have to be converted into `.sif`
 singularity build <image_name>.sif docker://ghcr.io/cevo-public/harvester:<image_name>
 ```
 
-## SPSP transferer
+## SPSP Exporter
 
 This function is unique because it is not (yet) included in the Harvester automation, even though the code to do it lives here. It also requires a key pair that is not available in the repo.
 

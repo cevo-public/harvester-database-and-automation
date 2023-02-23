@@ -1,6 +1,6 @@
 
-# First copy&paste the database directory into `spsp_transferer/`
-docker build -t spsp_transferer .
+# First copy&paste the database directory into `spsp_exporter/`
+docker build -t spsp_exporter .
 
 # USER-SPECIFIC THINGS - SET THESE!
 PANGODIR=
@@ -23,4 +23,4 @@ docker run \
 --volume=$PANGODIR/backup/sampleset:/mnt/pangolin/sampleset \
 --env SPSP_SERVER_IP=$SPSP_SERVER_IP \
 --env LAB_CODE=$LAB_CODE \
-spsp_transferer
+spsp_exporter
