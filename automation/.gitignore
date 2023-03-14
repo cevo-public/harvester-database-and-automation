@@ -5,7 +5,6 @@
 # External repositories
 database/
 pangolin_lineage_importer/pangolin/
-spsp_transferer/transfer-tool/
 
 # Data
 /data/

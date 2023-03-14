@@ -18,15 +18,12 @@ prepare_artifacts:
       - apt install -y git wget
       - git clone --depth=1 --branch=master https://github.com/cov-lineages/pangolin.git
       - rm -rf pangolin/.git
-      - git clone --depth=1 --branch=master https://gitlab.sib.swiss/SPSP/transfer-tool.git
-      - rm -rf transfer-tool/.git
       - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh --quiet -O miniconda3.sh
       - bash ./miniconda3.sh -b -p ./miniconda3
       - pwd
     artifacts:
         paths:
             - ./pangolin
-            - ./transfer-tool
 
 
 # Build the Docker image that most components are based on.
@@ -49,7 +46,7 @@ build_base_image:
           --cache-ttl=720h  # one month
 
 
-# Build the Docker images for the individual components (micro-services).
+# Build the Docker images for the individual components (services).
 # We retry the image build a second time if it fails, as Kaniko is
 # sometimes a bit fragile.
 build_components:

@@ -30,7 +30,7 @@ RUN \
         npm \
     && rm -rf /var/lib/apt/lists/*
 
-COPY database/ pangolin/ transfer-tool/ /app/
+COPY database/ pangolin/ /app/
 
 RUN Rscript /app/R/install_packages.R \
     && pip3 install -r /app/python/requirements.txt

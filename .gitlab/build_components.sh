@@ -31,11 +31,6 @@ do
         cp -R ${CI_PROJECT_DIR}/pangolin ${CI_PROJECT_DIR}/automation/$component
     fi
 
-    if [[ $component = spsp_transferer ]]; then
-        # Fetch repository of SPSP transfer tool, provided as an artifact.
-        cp -R ${CI_PROJECT_DIR}/transfer-tool ${CI_PROJECT_DIR}/automation/$component
-    fi
-
     /kaniko/executor \
         --context ${CI_PROJECT_DIR}/automation/$component \
         --dockerfile ${CI_PROJECT_DIR}/automation/$component/Dockerfile \
