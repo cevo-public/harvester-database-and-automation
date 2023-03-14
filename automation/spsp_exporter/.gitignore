@@ -1,0 +1,16 @@
+# Build artifacts
+/database/
+/transfer-tool/
+/data/
+/R/
+
+# Run-time artifacts
+/spsp/
+/vpipe/
+/config.yml
+/harvester-config.yml
+/spsp-config.yml
+
+# Secrets
+/identities/
+/config/env_*.*

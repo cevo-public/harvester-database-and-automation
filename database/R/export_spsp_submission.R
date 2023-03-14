@@ -889,9 +889,9 @@ check_config <- function(config_file) {
 # Production arguments
 parser <- argparse::ArgumentParser()
 parser$add_argument("--config", type = "character", help = "Path to spsp-config.yml.", default = "spsp-config.yml")
-parser$add_argument("--samplesetdir", type = "character", help = "Path to V-pipe sample directories.", default = "/mnt/pangolin/sampleset")
-parser$add_argument("--outdir", type = "character", help = "Path to output files for submission.", default = paste("/mnt/pangolin/consensus_data_for_release/spsp_submission", Sys.Date(), sep = "/"))
-parser$add_argument("--workingdir", type = "character", help = "Path to V-pipe working directory.", default = "/mnt/pangolin/working")
+parser$add_argument("--samplesetdir", type = "character", help = "Path to V-pipe sample directories.", default = "vpipe/sampleset")
+parser$add_argument("--outdir", type = "character", help = "Path to output files for submission.", default = paste("spsp", Sys.Date(), sep = "/"))
+parser$add_argument("--workingdir", type = "character", help = "Path to V-pipe working directory.", default = "vpipe/working")
 args <- parser$parse_args()
 args[["script_name"]] <- "export_spsp_submission.R"
 

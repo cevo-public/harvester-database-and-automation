@@ -1,0 +1,46 @@
+// Configuration of VS Code dev container
+//
+// When opening this folder in VS Code, it will see this file here and
+// offer to "Reopen in Container". It will then proceed to build the
+// Docker image defined in `Dockerfile` and run it with the configuration
+// below, which forwards the host environment to the container.
+
+{
+    "build": {"dockerfile": "Dockerfile"},
+    "workspaceFolder": "/app",
+    "containerEnv": {
+        "DATABASE_NAME":      "${localEnv:DATABASE_NAME}",
+        "DATABASE_HOST":      "${localEnv:DATABASE_HOST}",
+        "DATABASE_PORT":      "${localEnv:DATABASE_PORT}",
+        "DATABASE_USER":      "${localEnv:DATABASE_USER}",
+        "DATABASE_PASSWORD":  "${localEnv:DATABASE_PASSWORD}",
+        "EMAIL_HOST":         "${localEnv:EMAIL_HOST}",
+        "EMAIL_PORT":         "${localEnv:EMAIL_PORT}",
+        "EMAIL_USER":         "${localEnv:EMAIL_USER}",
+        "EMAIL_PASSWORD":     "${localEnv:EMAIL_PASSWORD}",
+        "EMAIL_SENDER":       "${localEnv:EMAIL_SENDER}",
+        "EMAIL_RECIPIENTS":   "${localEnv:EMAIL_RECIPIENTS}",
+        "VPIPE_HOST":         "${localEnv:VPIPE_HOST}",
+        "VPIPE_ROOT":         "${localEnv:VPIPE_ROOT}",
+        "VPIPE_USER":         "${localEnv:VPIPE_USER}",
+        "VPIPE_IDENTITY":     "${localEnv:VPIPE_IDENTITY}",
+        "RAWDATA_IDENTITY":   "${localEnv:RAWDATA_IDENTITY}",
+        "RAWDATA_PASSPHRASE": "${localEnv:RAWDATA_PASSPHRASE}",
+        "SPSP_SERVER_IP":     "${localEnv:SPSP_SERVER_IP}",
+        "SPSP_LAB_CODE":      "${localEnv:SPSP_LAB_CODE}",
+        "RUN_INTERVAL":       "${localEnv:RUN_INTERVAL}"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "REditorSupport.r",
+                "RDebugger.r-debugger"
+            ]
+        }
+    },
+    "runArgs": ["--privileged", "--expose", "5432", "--expose", "12345"],
+    "mounts": [
+        "source=${localWorkspaceFolder}/spsp,target=/app/spsp,type=bind",
+        "source=${localWorkspaceFolder}/identities,target=/app/identities,type=bind"
+    ]
+}

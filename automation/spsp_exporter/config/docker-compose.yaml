@@ -1,0 +1,33 @@
+﻿# Configuration template for running the service in production.
+# Add this snippet to the central Docker Compose configuration and
+# fill in or override the environment variables named below.
+services:
+  spsp-exporter:
+    image: registry.ethz.ch/sars_cov_2/s3c/registry.ethz.ch/sars_cov_2/s3c/harvester-database-and-automation:spsp-exporter-(release_tag)
+    container_name: spsp-exporter
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - DATABASE_NAME=
+      - DATABASE_HOST=
+      - DATABASE_PORT=5432
+      - DATABASE_USER=
+      - DATABASE_PASSWORD=
+      - EMAIL_HOST=
+      - EMAIL_PORT=587
+      - EMAIL_USER=
+      - EMAIL_PASSWORD=
+      - EMAIL_SENDER=
+      - EMAIL_RECIPIENTS=<comma-separated list>
+      - VPIPE_HOST=
+      - VPIPE_ROOT=
+      - VPIPE_USER=
+      - VPIPE_IDENTITY=SPSP-Exporter
+      - RAWDATA_IDENTITY=raw_data_upload
+      - RAWDATA_PASSPHRASE=
+      - SPSP_SERVER_IP=
+      - SPSP_LAB_CODE=
+      - RUN_INTERVAL=43200
+    volumes:
+      - ./identities/:/app/identities/
+      - ./spsp/:/app/spsp/

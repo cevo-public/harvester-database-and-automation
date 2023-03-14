@@ -1,57 +1,67 @@
-## Build app ##
+# This Docker file is meant to be build in the context of this very
+# folder, with `docker build --tag spsp-exporter .`, but requires that
+# the `database` folder has been copied here beforehand.
+
+
+# Compile Java components in separate Docker container.
+# This is intended to make the final image smaller, by keeping out the
+# Java build system.
 
 FROM openjdk:15 AS builder
-WORKDIR /build/
+WORKDIR /build
 
 COPY database/java/ .
 RUN chmod +x ./gradlew
 RUN ./gradlew clean build -x test
 
 
-## Run server ##
+# Build actual Docker image.
 
-FROM rocker/tidyverse:4.0.3 AS server
-WORKDIR /app/
-# Copy compiled harvester java program into this container
-COPY --from=builder /build/build/libs /app
+FROM rocker/tidyverse:4.2
+WORKDIR /app
+RUN apt-get update
 
-# Update packages
-RUN apt-get update && apt-get -y upgrade
+# Install Java run-time environment, see: https://jdk.java.net/java-se-ri/15.
+RUN mkdir -p /usr/java
+ARG JRE_OPENJDK=https://download.java.net/openjdk
+ARG JRE_ARCHIVE=jdk15/ri/openjdk-15+36_linux-x64_bin.tar.gz
+RUN wget $JRE_OPENJDK/$JRE_ARCHIVE --output-document=- | \
+    tar --extract --gunzip --directory /usr/java
+ENV JAVA_HOME=/usr/java/jdk-15/bin
+ENV PATH=$JAVA_HOME:$PATH
 
-## Install SPSP transfer tool prerequisites
-RUN apt-get install -y netcat #nc command
-RUN apt-get install -y gpg #gpg command
-RUN apt-get install -y openssh-client #sftp command
-RUN apt-get update && apt-get install -y curl  # for testing IP address
+# Detect current Java setup and update the corresponding configuration in R.
+RUN /usr/local/bin/R CMD javareconf
 
-# Install package for mounting a smb cifs drive
+# Install required R packages in addition to those in the Tidyverse collection.
+COPY dependencies.R .
+RUN /usr/local/bin/Rscript dependencies.R
+
+# Install package for mounting an SMB CIFS drive.
 RUN apt-get install -y cifs-utils
 
-# Install java
-RUN wget https://download.java.net/openjdk/jdk15/ri/openjdk-15+36_linux-x64_bin.tar.gz
-RUN tar xvf openjdk-15*_bin.tar.gz
-RUN mkdir -p /usr/java
-RUN mv jdk-15 /usr/java/jdk-15
-ENV PATH="/usr/java/jdk-15/bin:${PATH}"
-ENV JAVA_HOME="/usr/java/jdk-15/bin"
+# Install package for mounting remote file system via SSH.
+RUN apt-get install -y sshfs
 
-# Install necessary R packages
-# 1st command is somehow necessary for rJava after update of the system Java installation
-# Do this before copying the rest of database directory because it takes ages, want to use cached version if possible
-RUN /usr/local/bin/R CMD javareconf
-RUN mkdir /app/R
-COPY database/R/install_packages.R /app/R
-RUN /usr/local/bin/Rscript /app/R/install_packages.R
-
-# Install SPSP transfer tool
+# Install SPSP Transfer Tool and its prerequisites.
+RUN apt-get install -y netcat
+RUN apt-get install -y gpg
+RUN apt-get install -y openssh-client
+RUN apt-get install -y curl
 RUN git clone https://gitlab.sib.swiss/clinbio/spsp-ng/transfer-tool.git
 
-# Copy over database scripts
-COPY database/ /app
+# Copy over pre-built Java jar file.
+COPY --from=builder /build/build/libs .
 
-# Copy script to do transfer
-COPY transfer.sh /app/transfer.sh
-RUN chmod +x /app/transfer.sh
+# Copy R scripts from source.
+COPY database/R/ R/
+COPY database/data/ data/
+COPY database/spsp-config.yml .
 
-# Run script to generate and submit submission files
-ENTRYPOINT ["java", "-Xmx12g", "-jar", "/app/vineyard-1.0-SNAPSHOT.jar", "SpspExporter", "/mnt/pangolin/sampleset", "/app/outdir", "/mnt/pangolin/working"]
+# Copy utility scripts.
+COPY scripts/ scripts/
+RUN chmod +x scripts/*.sh
+COPY ReadMe.md .
+
+# Entry point when running in production.
+ENTRYPOINT ["/bin/bash", "scripts/loop_indefinitely.sh"]

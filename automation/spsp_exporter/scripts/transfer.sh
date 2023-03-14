@@ -1,7 +1,4 @@
-#!/bin/bash
-set -euo pipefail
-
-# ------------------ TRANSFER FILES TO SPSP ------------------
+# Transfer files to SPSP.
 
 timestamp=`date +%Y/%m/%d-%H:%M:%S`
 echo "[$timestamp] Beginning transfer to SPSP. MAKE SURE YOU ARE ON THE VPN! "
@@ -27,7 +24,7 @@ cd /app/transfer-tool/
 # Configure the .env file for SPSP transfer tool
 timestamp=`date +%Y/%m/%d-%H:%M:%S`
 echo "[$timestamp] Configuring the .env file for SPSP transfer tool."
-echo 'ID=$LAB_CODE' > .env
+echo 'ID=$SPSP_LAB_CODE' > .env
 echo 'HOST=spsp.sib.swiss' >> .env
 echo 'SFTP_URL=${ID}@${HOST}:/data' >> .env
 
@@ -49,8 +46,8 @@ echo "[$timestamp] Testing transfer tool script spsp with command './spsp versio
 
 # Check SSH connection to SPSP SFTP server
 #timestamp=`date +%Y/%m/%d-%H:%M:%S`
-#echo "[$timestamp] Checking SSH connection with command 'ssh -T $LAB_CODE@spsp.sib.swiss'"
-#ssh -v -T $LAB_CODE@spsp.sib.swiss  # This is useful and should return "This service allows sftp connections only." However, it prevents subsequent commands from running and I don't know why
+#echo "[$timestamp] Checking SSH connection with command 'ssh -T $SPSP_LAB_CODE@spsp.sib.swiss'"
+#ssh -v -T $SPSP_LAB_CODE@spsp.sib.swiss  # This is useful and should return "This service allows sftp connections only." However, it prevents subsequent commands from running and I don't know why
 
 # See what IP address the files will be sent from
 timestamp=`date +%Y/%m/%d-%H:%M:%S`
@@ -61,4 +58,3 @@ curl ifconfig.io
 timestamp=`date +%Y/%m/%d-%H:%M:%S`
 echo "[$timestamp] Running transfer tool script with command './spsp auto'"
 ./spsp auto
-
