@@ -304,31 +304,32 @@ report_resequenced_samples <- function(to_release, db_connection, args) {
   to_release_sn$is_reseq[which(to_release_sn$sample_number%in%submitted$sample_number)] <- TRUE
   to_release_sn_final <- NULL
   to_ignore <- NULL
-  for(i in 1:nrow(to_release_sn)){
-      if(to_release_sn$is_reseq[i]){
-          if(is.na(to_release_sn$sample_number[i])){
-            to_ignore <- rbind(to_ignore, to_release_sn[i,])
-            next()
-          }
-          first_submit_ethid <- submitted$ethid[which(submitted$sample_number%in%to_release_sn$sample_number[i])]
-          first_submit <- cons[which(cons$ethid%in%first_submit_ethid),]
-          first_submit <- left_join(first_submit, cons_meta)
-          first_submit <- first_submit[which(first_submit$consensus_n == min(first_submit$consensus_n)),]
-
-          if(to_release_sn$consensus_n[i]/min(first_submit$consensus_n) < 0.9){
-              myline <- to_release_sn[i,]
-              myline$first_submit_ethid <- first_submit_ethid
-              to_release_sn_final <- rbind(to_release_sn_final, myline)
-          }else{
+  if (nrow(to_release_sn) >= 1) {
+    for(i in 1:nrow(to_release_sn)){
+        if(to_release_sn$is_reseq[i]){
+            if(is.na(to_release_sn$sample_number[i])){
               to_ignore <- rbind(to_ignore, to_release_sn[i,])
-          }
-      }else{
-          myline <- to_release_sn[i,]
-          myline$first_submit_ethid <- NA
-          to_release_sn_final <- rbind(to_release_sn_final, myline)
-      }
+              next()
+            }
+            first_submit_ethid <- submitted$ethid[which(submitted$sample_number%in%to_release_sn$sample_number[i])]
+            first_submit <- cons[which(cons$ethid%in%first_submit_ethid),]
+            first_submit <- left_join(first_submit, cons_meta)
+            first_submit <- first_submit[which(first_submit$consensus_n == min(first_submit$consensus_n)),]
+
+            if(to_release_sn$consensus_n[i]/min(first_submit$consensus_n) < 0.9){
+                myline <- to_release_sn[i,]
+                myline$first_submit_ethid <- first_submit_ethid
+                to_release_sn_final <- rbind(to_release_sn_final, myline)
+            }else{
+                to_ignore <- rbind(to_ignore, to_release_sn[i,])
+            }
+        }else{
+            myline <- to_release_sn[i,]
+            myline$first_submit_ethid <- NA
+            to_release_sn_final <- rbind(to_release_sn_final, myline)
+        }
+    }
   }
- 
 
   print(log.info(
     msg = paste0("Detected ",length(to_release_sn$is_reseq), " resequencings. Of them, ",length(to_release_sn_final$is_reseq), "are at least 10% better in quality (#Ns in the consensus) and will be submitted as an update: "),
