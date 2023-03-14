@@ -44,7 +44,7 @@ COPY database/R/install_packages.R /app/R
 RUN /usr/local/bin/Rscript /app/R/install_packages.R
 
 # Install SPSP transfer tool
-RUN git clone https://gitlab.sib.swiss/SPSP/transfer-tool.git transfer-tool/
+RUN git clone https://gitlab.sib.swiss/clinbio/spsp-ng/transfer-tool.git
 
 # Copy over database scripts
 COPY database/ /app
