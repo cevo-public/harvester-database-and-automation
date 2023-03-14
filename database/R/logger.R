@@ -66,13 +66,13 @@ notify.error <- function(msg, fcn) {
   return(json_entry)
 }
 
-#' Generate JSON-formatted log entry. 
+#' Generate JSON-formatted log entry.
 #' @param type One of 'notification' or 'log'
 #' @param priority One of 'INFO', 'WARN', or 'ERROR'.
 #' @param fcn Character giving the calling function, e.g. "spsp_exporter.R::fetch_data".
 #' @param script_name Character giving the script name, e.g. "spsp_exporter.R".
 #' @param msg Character message, e.g. "Data not found."
-#' @return JSON-formatted log entry, e.g. {"timestamp":["Tue May 18 09:45:25 2021"],"priority":["ERROR"],"function":["spsp_exporter.R::fetch_data"],"payload":["Data not found."]} 
+#' @return JSON-formatted log entry, e.g. {"timestamp":["Tue May 18 09:45:25 2021"],"priority":["ERROR"],"function":["spsp_exporter.R::fetch_data"],"payload":["Data not found."]}
 get_json_entry <- function(type, priority, fcn = NULL, msg, script_name = NULL) {
   # Check input
   types <- c("notification", "log")
@@ -80,32 +80,35 @@ get_json_entry <- function(type, priority, fcn = NULL, msg, script_name = NULL) 
   if (!(priority %in% priorities)) {
     get_json_entry(
       type = "log",
-      priority = "ERROR", 
+      priority = "ERROR",
       msg = paste("Specified priority not one of", paste0(priorities, collapse = ", ")),
       script_name = script_name,
-      fcn = fcn)
+      fcn = fcn
+    )
   } else if (!(type %in% types)) {
     get_json_entry(
       type = "log",
-      priority = "ERROR", 
+      priority = "ERROR",
       msg = paste("Specified type not one of", paste0(types, collapse = ", ")),
       script_name = script_name,
-      fcn = fcn)
+      fcn = fcn
+    )
   }
   if (!(is.null(script_name))) {
     fcn <- paste(
-      script_name, "::", 
-      gsub(pattern = "\\(.*\\)", replacement = "", x = deparse(sys.call(-1))), 
-      sep = "")
+      script_name, "::",
+      gsub(pattern = "\\(.*\\)", replacement = "", x = deparse(sys.call(-1))),
+      sep = ""
+    )
   }
-  
+
   # Create log entry
   entry <- list(
-    "timestamp" = get_timestamp(), 
+    "timestamp" = get_timestamp(),
     "type" = type,
     "function" = fcn,
     "payload" = list(
-      "priority" = priority, 
+      "priority" = priority,
       "payload" = msg
     )
   )
@@ -114,7 +117,7 @@ get_json_entry <- function(type, priority, fcn = NULL, msg, script_name = NULL) 
 }
 
 #' Generate a timestamp to be used in log entries.
-#' @return Character timestamp, e.g. "Tue May 18 09:37:44 2021". 
+#' @return Character timestamp, e.g. "Tue May 18 09:37:44 2021".
 get_timestamp <- function() {
   stamp <- timestamp(prefix = "", suffix = "", quiet = T)
   return(stamp)
@@ -124,9 +127,13 @@ get_timestamp <- function() {
 #' @param dataframe A dataframe containing information to log.
 #' @return Character.
 format_dataframe_for_log <- function(dataframe) {
-  text_for_log <- paste0(apply(
-    dataframe, 
-    1, paste, collapse = " - "),
-    collapse = "\n")
+  text_for_log <- paste0(
+    apply(
+      dataframe,
+      1, paste,
+      collapse = " - "
+    ),
+    collapse = "\n"
+  )
   return(text_for_log)
 }

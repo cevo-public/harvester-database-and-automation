@@ -8,17 +8,16 @@
 #' @param db_connection
 #' @return Data frame with columns sample_name and priority with one row per sequence in context set.
 get_priority <- function(
-  db_connection, focal_samples, context_samples,
-  tmpdir = "tmp/priority",
-  overwrite = F,
-  clean_tmpdir = T,
-  table = "gisaid_sequence",
-  sample_name_col = "strain",
-  seq_col = "aligned_seq",
-  date_col = "date",
-  ncovdir = "../ncov",
-  python = "python3"
-) {
+    db_connection, focal_samples, context_samples,
+    tmpdir = "tmp/priority",
+    overwrite = F,
+    clean_tmpdir = T,
+    table = "gisaid_sequence",
+    sample_name_col = "strain",
+    seq_col = "aligned_seq",
+    date_col = "date",
+    ncovdir = "../ncov",
+    python = "python3") {
   # Set up tmpdir for temporary output
   if (dir.exists(tmpdir) & overwrite) {
     system(command = paste("rm", tmpdir))
@@ -52,12 +51,15 @@ get_priority <- function(
   # Run priority script
   priorities_command <- paste0(python, " ", ncovdir, "/scripts/priorities.py", " --alignment ", tmpdir, "/context.fasta", " --reference ", ncovdir, "/defaults/reference_seq.gb", " --metadata ", tmpdir, "/metadata.txt", " --focal-alignment ", tmpdir, "/focal.fasta", " --output ", tmpdir, "/priorities.txt")
   cat("Running nextstrain priorities script with command:",
-      priorities_command, sep = "\n")
+    priorities_command,
+    sep = "\n"
+  )
   system(command = priorities_command)
 
   # Return priority results
   priorities <- read.table(
-    file = paste0(tmpdir, "/priorities.txt"), sep = "\t") %>%
+    file = paste0(tmpdir, "/priorities.txt"), sep = "\t"
+  ) %>%
     rename(strain = V1, "priority" = V2) %>%
     arrange(priority)
 
@@ -71,12 +73,11 @@ get_priority <- function(
 #' Find genetically similar sequences from context set to focal set of sequences.
 #' By running a modified version of the script that fetches sequenecs directly from the database.
 run_nextstrain_priority <- function(
-  focal_strains, nonfocal_strains, prefix, outdir,
-  python_path, priorities_script, reference, verbose = F,
-  focal_strain_table, context_strain_table,
-  focal_sample_name_col, context_sample_name_col,
-  focal_seq_col, context_seq_col, config_filepath = "database/config.yml"
-) {
+    focal_strains, nonfocal_strains, prefix, outdir,
+    python_path, priorities_script, reference, verbose = F,
+    focal_strain_table, context_strain_table,
+    focal_sample_name_col, context_sample_name_col,
+    focal_seq_col, context_seq_col, config_filepath = "database/config.yml") {
   n_focal_strains <- length(focal_strains)
   n_nonfocal_strains <- length(nonfocal_strains)
 
@@ -87,21 +88,27 @@ run_nextstrain_priority <- function(
     warning(paste("No context sequences found for", prefix))
     return(NA)
   } else if (n_nonfocal_strains > 20000) {
-    stop(paste("Too many sequences for priorities.py:",
-               n_nonfocal_strains, "non-focal sequences."))
+    stop(paste(
+      "Too many sequences for priorities.py:",
+      n_nonfocal_strains, "non-focal sequences."
+    ))
   }
-  print(paste("Running priorities.py for", prefix, "with",
-              length(focal_strains), "focal sequences and",
-              length(nonfocal_strains), "non-focal sequences."))
+  print(paste(
+    "Running priorities.py for", prefix, "with",
+    length(focal_strains), "focal sequences and",
+    length(nonfocal_strains), "non-focal sequences."
+  ))
 
   outfile_focal_strains <- paste0(outdir, "/", prefix, "_focal_strains.txt")
   outfile_context_strains <- paste0(outdir, "/", prefix, "_nonfocal_strains.txt")
   write.table(
     x = c("strain", focal_strains), row.names = F, quote = F, col.names = F,
-    file = outfile_focal_strains)
+    file = outfile_focal_strains
+  )
   write.table(
     x = c("strain", nonfocal_strains), row.names = F, quote = F,
-    col.names = F, file = outfile_context_strains)
+    col.names = F, file = outfile_context_strains
+  )
 
   outfile_priorities <- paste0(outdir, "/", prefix, "_priorities.txt")
   priorities_command <- paste(
@@ -117,7 +124,8 @@ run_nextstrain_priority <- function(
     "--focal-seq-col", focal_seq_col,
     "--context-seq-col", context_seq_col,
     "--config-filepath", config_filepath,
-    "--automated")
+    "--automated"
+  )
   if (verbose) {
     print(priorities_command)
   }
@@ -127,7 +135,8 @@ run_nextstrain_priority <- function(
     file = paste0(outdir, "/", prefix, "_priorities.txt"),
     header = F,
     col.names = c("strain", "priority", "focal_strain"),
-    stringsAsFactors = F) %>%
+    stringsAsFactors = F
+  ) %>%
     arrange(desc(priority))
 
   system(command = paste("rm", outfile_focal_strains))
@@ -141,40 +150,44 @@ run_nextstrain_priority <- function(
 #' @return minimal metadata in nextstrain format. Enables e.g. run of nextstrain
 #' priorities.py and diagnostic.py scripts.
 export_metadata_as_nextstrain_format <- function(
-  db_connection, sample_names, metadata_outfile,
-  table, sample_name_col, date_col,
-  virus = "ncov", region = "dummy_region", date_submitted_delay = 14
-) {
+    db_connection, sample_names, metadata_outfile,
+    table, sample_name_col, date_col,
+    virus = "ncov", region = "dummy_region", date_submitted_delay = 14) {
   metadata_tbl <- dplyr::tbl(db_connection, table) %>%
     filter(!!sym(sample_name_col) %in% sample_names) %>%
     select(!!sym(sample_name_col), !!sym(date_col)) %>%
     collect()
   metadata_tbl <- metadata_tbl %>%
-    mutate(virus = "ncov",
-           region = "dummy_region",
-           date_submitted = as.Date(!!sym(date_col)) + date_submitted_delay,
-           comment = "region and date_submitted have dummy values.") %>%
+    mutate(
+      virus = "ncov",
+      region = "dummy_region",
+      date_submitted = as.Date(!!sym(date_col)) + date_submitted_delay,
+      comment = "region and date_submitted have dummy values."
+    ) %>%
     rename(name = !!sym(sample_name_col), date = !!sym(date_col))
   write.table(
     x = metadata_tbl,
     file = metadata_outfile,
-    sep = "\t", row.names = F)
+    sep = "\t", row.names = F
+  )
 }
 
 #' Get the raw read distribution at a position in a sequence.
 get_read_distribution <- function(
-  db_connection, sample_name, pos_list,
-  READ_TOPDIR = "/Volumes/shared/covid19-pangolin/backup/working/samples/"
-) {
+    db_connection, sample_name, pos_list,
+    READ_TOPDIR = "/Volumes/shared/covid19-pangolin/backup/working/samples/") {
   # Get filepath for basecnt.tsv.gz
   readfile_info <- dplyr::tbl(db_connection, "consensus_sequence") %>%
-    filter(sample_name == !! sample_name) %>%
+    filter(sample_name == !!sample_name) %>%
     select(ethid, sample_name, sequencing_batch, seq_aligned) %>%
     collect() %>%
     mutate(
       readfile = paste(
         READ_TOPDIR, sample_name, sequencing_batch, "alignments",
-        "basecnt.tsv.gz", sep = "/"))
+        "basecnt.tsv.gz",
+        sep = "/"
+      )
+    )
 
   # See what the raw reads are at this position
   read_file <- unlist(readfile_info$readfile)
@@ -192,14 +205,17 @@ get_read_distribution <- function(
 
   # See what the base calls are
   pos_seq_chars <- toupper(unlist(strsplit(
-    x = unlist(readfile_info$seq), split = "")))[pos_list + 1]
+    x = unlist(readfile_info$seq), split = ""
+  )))[pos_list + 1]
   pos_ref_chars <- toupper(unlist(strsplit(
     x = unlist(reference$seq),
-    split = "")))[pos_list + 1]
+    split = ""
+  )))[pos_list + 1]
   pos_seq_data <- data.frame(
     pos = pos_list,
     consensus = pos_seq_chars,
-    reference = pos_ref_chars)
+    reference = pos_ref_chars
+  )
   pos_data <- merge(x = pos_read_data, y = pos_seq_data, all = T) %>%
     mutate(pos = as.numeric(as.character(pos)) + 1)
 
@@ -268,7 +284,7 @@ get_mean_n_nucleotide_differences <- function(seqs, pairwise = F) {
 coalesce_join <- function(x, y, by = NULL, suffix = c(".x", ".y"),
                           join = dplyr::left_join, ...) {
   joined <- join(x, y, by = by, suffix = suffix, ...)
-  cols <- union(names(x), names(y))  # names of desired output
+  cols <- union(names(x), names(y)) # names of desired output
 
   to_coalesce <- names(joined)[!names(joined) %in% cols]
   suffix_used <- suffix[ifelse(endsWith(to_coalesce, suffix[1]), 1, 2)]
@@ -277,18 +293,21 @@ coalesce_join <- function(x, y, by = NULL, suffix = c(".x", ".y"),
   to_coalesce <- unique(substr(
     to_coalesce,
     1,
-    nchar(to_coalesce) - nchar(suffix_used)))
+    nchar(to_coalesce) - nchar(suffix_used)
+  ))
 
   # cast to factor for dplyr::coalesce
   joined[c(paste0(to_coalesce, suffix[1]), paste0(to_coalesce, suffix[2]))] <- apply(
     X = joined[c(paste0(to_coalesce, suffix[1]), paste0(to_coalesce, suffix[2]))],
     MARGIN = 2,
-    FUN = as.factor)
+    FUN = as.factor
+  )
 
   names(to_coalesce) <- to_coalesce
-  coalesced <- purrr::map_dfc(to_coalesce, ~dplyr::coalesce(
+  coalesced <- purrr::map_dfc(to_coalesce, ~ dplyr::coalesce(
     joined[[paste0(.x, suffix[1])]],
-    joined[[paste0(.x, suffix[2])]]))
+    joined[[paste0(.x, suffix[2])]]
+  ))
 
   return(dplyr::bind_cols(joined, coalesced)[cols])
 }
@@ -316,8 +335,7 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
                                  seq_col = "seq_aligned",
                                  mask_from_start = 0,
                                  mask_from_end = 0,
-                                 gzip = F
-) {
+                                 gzip = F) {
   if (length(sample_names) == 0) {
     warning("No sample names specified for export to fasta. Skipping.")
     return()
@@ -363,7 +381,7 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
         writeLines(missing_samples, con = warn_outfile_con, sep = "\n")
         close(warn_outfile_con)
       }
-      sample_names <- sample_names[!(sample_names %in% missing_samples)]  # remove samples from list for header mapping
+      sample_names <- sample_names[!(sample_names %in% missing_samples)] # remove samples from list for header mapping
     }
   }
   if (!is.null(header_mapping)) {
@@ -383,13 +401,14 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
       writeLines(
         unlist(seq_tbl[i, c("header", seq_col)]),
         con = seq_outfile_con,
-        sep = "\n")
+        sep = "\n"
+      )
       close(seq_outfile_con)
     }
     if (gzip) {
       system(command = paste0("gzip ", seq_outdir, "/*.fasta"))
-      #get rid of the ._ files that may be generated by MacOS
-      hidden_files <- list.files(seq_outdir,all.files=TRUE)
+      # get rid of the ._ files that may be generated by MacOS
+      hidden_files <- list.files(seq_outdir, all.files = TRUE)
       if (length(grep("\\._", hidden_files)) > 0) {
         system(command = paste0("rm ", seq_outdir, "/._*.fasta.gz"))
       }
@@ -400,7 +419,8 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
       writeLines(
         unlist(seq_tbl[i, c("header", seq_col)]),
         con = seq_outfile_con,
-        sep = "\n")
+        sep = "\n"
+      )
     }
     close(seq_outfile_con)
     if (gzip) {
@@ -427,12 +447,11 @@ mask_sites_in_seq_string <- function(seq_string, mask_from_start, mask_from_end,
 #' @param key_col Either a character key column name or a list of character key column names.
 #' @return nothing, just prints a summary.
 summarize_update <- function(
-  table_name, new_table, con, append_new_rows, cols_to_update, key_col
-) {
+    table_name, new_table, con, append_new_rows, cols_to_update, key_col) {
   existing_keys <- unlist(dplyr::tbl(con, table_name) %>%
     select(all_of(key_col)) %>%
     collect() %>%
-      tidyr::unite(col = "concatenated_keys", all_of(key_col)) %>%
+    tidyr::unite(col = "concatenated_keys", all_of(key_col)) %>%
     select(concatenated_keys))
   new_table_keys <- unlist(new_table %>%
     tidyr::unite(col = "concatenated_keys", all_of(key_col)) %>%
@@ -454,15 +473,18 @@ get_key_col_sql <- function(key_col) {
   if (length(key_col) == 1) {
     key_col_sql <- paste(
       "WHERE", paste("t", key_col, sep = "."), "=",
-      paste("s", key_col, sep = "."))
+      paste("s", key_col, sep = ".")
+    )
   } else {
     key_col_sql <- paste(
       "WHERE", paste("t", key_col[1], sep = "."), "=",
-      paste("s", key_col[1], sep = "."))
+      paste("s", key_col[1], sep = ".")
+    )
     for (i in 2:length(key_col)) {
       key_col_sql_phrase <- paste(
         "AND", paste("t", key_col[i], sep = "."), "=",
-        paste("s", key_col[i], sep = "."))
+        paste("s", key_col[i], sep = ".")
+      )
       key_col_sql <- paste(key_col_sql, key_col_sql_phrase)
     }
   }
@@ -479,12 +501,12 @@ get_key_col_sql <- function(key_col) {
 #' @param table_spec Data frame with table column type specifications.
 #' @param close_con If false, leaves connection to database 'con' open so that this function can be called in a loop.
 update_table <- function(
-  table_name, new_table, con, append_new_rows = T, cols_to_update, key_col,
-  table_spec, close_con = T, run_summarize_update = T, verbose = F
-) {
+    table_name, new_table, con, append_new_rows = T, cols_to_update, key_col,
+    table_spec, close_con = T, run_summarize_update = T, verbose = F) {
   if (run_summarize_update) {
     summarize_update(
-      table_name, new_table, con, append_new_rows, cols_to_update, key_col)
+      table_name, new_table, con, append_new_rows, cols_to_update, key_col
+    )
   }
 
   # create staging table
@@ -495,14 +517,16 @@ update_table <- function(
   }
   field_types <- table_spec$type
   names(field_types) <- table_spec$name
-  field_types <- field_types[names(field_types) %in% colnames(new_table)]  # only provide field types for columns to be imported to staging table
+  field_types <- field_types[names(field_types) %in% colnames(new_table)] # only provide field types for columns to be imported to staging table
   if (verbose) {
     print(paste("Writing staging table", staging_table_name, "to", con))
     print(paste("Field types are:", field_types))
   }
   DBI::dbWriteTable(
-    con, staging_table_name, new_table, field.types = field_types,
-    row.names=FALSE)
+    con, staging_table_name, new_table,
+    field.types = field_types,
+    row.names = FALSE
+  )
 
   # Append columns from staging for rows that only exist in staging
   key_col_sql <- get_key_col_sql(key_col)
@@ -513,7 +537,8 @@ update_table <- function(
       "WHERE NOT EXISTS",
       "(SELECT 1 FROM", table_name, "t",
       key_col_sql,
-      ")")
+      ")"
+    )
     res <- DBI::dbSendStatement(con, append_sql)
     DBI::dbClearResult(res)
   }
@@ -527,7 +552,8 @@ update_table <- function(
     "UPDATE", table_name, "t",
     "SET", paste0(update_equalities, collapse = ", "),
     "FROM", staging_table_name, "s",
-    key_col_sql)
+    key_col_sql
+  )
   res <- DBI::dbSendStatement(con, update_sql)
   DBI::dbClearResult(res)
 
@@ -545,9 +571,9 @@ get_ethid_from_gisaid_strain <- function(gisaid_strain) {
     warning(paste(gisaid_strain, "not recognized as being from ETHZ returning NA for ethid"))
     return(NA)
   }
-  ethid <- strsplit(x = gisaid_strain, split = "-")[[1]][length(strsplit(x = gisaid_strain, split = "-")[[1]])]  # take everything after last "-"
-  ethid <- strsplit(x = ethid, split = "/")[[1]][1]  # take everything before first "/"
-  ethid <- gsub(x = ethid, pattern = "plus", replacement = "")  # remove suffix "plus" if present
+  ethid <- strsplit(x = gisaid_strain, split = "-")[[1]][length(strsplit(x = gisaid_strain, split = "-")[[1]])] # take everything after last "-"
+  ethid <- strsplit(x = ethid, split = "/")[[1]][1] # take everything before first "/"
+  ethid <- gsub(x = ethid, pattern = "plus", replacement = "") # remove suffix "plus" if present
   ethid <- as.numeric(ethid)
   return(ethid)
 }
@@ -563,36 +589,42 @@ get_ethid_from_gisaid_strain <- function(gisaid_strain) {
 get_ethid_from_sample_name <- function(sample_name, db_connection) {
   is_ethid_format <- grepl(
     x = sample_name,
-    pattern = "^[[:digit:]]{6}(_.*|$)")
+    pattern = "^[[:digit:]]{6}(_.*|$)"
+  )
   is_sample_number_format <- grepl(
     x = sample_name,
-    pattern = "^[[:digit:]]{8}(_.*|$)")
-  if (is_ethid_format) {  # Check if ETHID is in the test_metadata table
+    pattern = "^[[:digit:]]{8}(_.*|$)"
+  )
+  if (is_ethid_format) { # Check if ETHID is in the test_metadata table
     ethid <- unlist(strsplit(sample_name, split = "_"))[1]
     in_vt_once <- nrow(
       dplyr::tbl(db_connection, "test_metadata") %>%
-        filter(ethid == !! ethid) %>%
-        collect()) == 1
+        filter(ethid == !!ethid) %>%
+        collect()
+    ) == 1
     if (in_vt_once) {
       return(ethid)
     } else {
       warning(paste(ethid, "found 0 or > 1 times in the Viollier test table column 'ethid'. Invalid ETHID."))
       return(NA)
     }
-  } else if (is_sample_number_format) {  # Check if sample number is in the test_metadata table test_id field
+  } else if (is_sample_number_format) { # Check if sample number is in the test_metadata table test_id field
     ethid <- unlist(strsplit(sample_name, split = "_"))[1]
-    test_metadata <- dplyr::tbl(db_connection, "test_metadata") %>% select(test_id) %>% collect()
+    test_metadata <- dplyr::tbl(db_connection, "test_metadata") %>%
+      select(test_id) %>%
+      collect()
     in_vt_once <- nrow(
-        test_metadata %>% mutate(sample_number = unlist(lapply(strsplit(test_metadata$test_id, "/"),function(x)x[2]))) %>%
-        filter(sample_number == !! ethid) %>%
-        collect()) == 1
+      test_metadata %>% mutate(sample_number = unlist(lapply(strsplit(test_metadata$test_id, "/"), function(x) x[2]))) %>%
+        filter(sample_number == !!ethid) %>%
+        collect()
+    ) == 1
     if (in_vt_once) {
       return(ethid)
     } else {
       warning(paste(ethid, "found 0 or > 1 times in the Viollier test table column 'sample_number'. Invalid ETHID."))
       return(NA)
     }
-  } else {  # Control sample, sample from ZRH, EAWAG sample, other non-standard sample
+  } else { # Control sample, sample from ZRH, EAWAG sample, other non-standard sample
     warning(paste("ethid not found in sample name:", sample_name, "\n", sep = " "))
     return(NA)
   }
@@ -605,8 +637,7 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
 #' @param type_prefix Normally the script tries to guess what custom types for this table would be named. But you can also specify a prefix here.
 #' @return A data table coerced to the types specified in the database schema.
 enforce_sql_spec <- function(
-  table, table_name, db_connection, type_prefix = NULL, n_cores = 1, verbose = F
-) {
+    table, table_name, db_connection, type_prefix = NULL, n_cores = 1, verbose = F) {
   table_spec <- parse_table_specification(table_name = table_name, db_connection = db_connection)
   col_spec <- parse_column_specification(table_spec = table_spec, db_connection = db_connection)
   for (colname in colnames(table)) {
@@ -616,7 +647,8 @@ enforce_sql_spec <- function(
     col_spec_names <- c(
       colname,
       paste(unique(table_name, type_prefix), colname, sep = "_"),
-      paste(unique(table_name, type_prefix), colname, "type", sep = "_"))
+      paste(unique(table_name, type_prefix), colname, "type", sep = "_")
+    )
     col_spec_name <- col_spec_names[which(col_spec_names %in% names(col_spec))]
     if (length(col_spec_name) > 0) {
       if (verbose) {
@@ -635,7 +667,8 @@ enforce_sql_spec <- function(
         colname = colname,
         values = table[[colname]],
         type = table_spec[table_spec$name == colname, "type"],
-        n_cores = n_cores)
+        n_cores = n_cores
+      )
     }
     if (table_spec[table_spec$name == colname, "unique"]) {
       if (anyDuplicated(table[[colname]])) {
@@ -674,7 +707,8 @@ parse_table_specification <- function(table_name, db_connection) {
     rename(name = column_name, type = udt_name) %>%
     mutate(unique = ifelse(
       test = name %in% col_constraints$column_name,
-      yes = T, no = F))
+      yes = T, no = F
+    ))
   return(table_spec)
 }
 
@@ -686,7 +720,8 @@ parse_table_specification <- function(table_name, db_connection) {
 parse_column_specification <- function(table_spec = NULL, table_name = NULL, db_connection) {
   if (is.null(table_spec)) {
     table_spec <- parse_table_specification(
-      table_name = table_name, db_connection = db_connection)
+      table_name = table_name, db_connection = db_connection
+    )
   }
   sql <- "SELECT pg_type.typname, pg_enum.enumlabel FROM
   pg_type JOIN
@@ -710,7 +745,7 @@ enforce_column_type <- function(colname, values, type, n_cores = 1) {
   } else if (type == "int4") {
     coerceion_function <- as.integer
   } else if (type == "date") {
-    return(as.character(unlist(parallel::mclapply(X = values, FUN = standardize_date, mc.cores =  n_cores))))
+    return(as.character(unlist(parallel::mclapply(X = values, FUN = standardize_date, mc.cores = n_cores))))
   } else if (type == "bool") {
     coerceion_function <- as.logical
   } else if (type == "float4" | type == "float8") {
@@ -729,7 +764,8 @@ enforce_column_type <- function(colname, values, type, n_cores = 1) {
       message(paste("Can't coerce column", colname, "to type", type))
       message(cond)
       stop()
-    })
+    }
+  )
   return(coerced_values)
 }
 
@@ -761,7 +797,9 @@ getfilename_priority_bag_meldeformular <- function(filenames) {
     filename = unique(filenames),
     filedate = unlist(lapply(
       X = unique(filenames),
-      FUN = get_bag_meldeformular_file_date))) %>%
+      FUN = get_bag_meldeformular_file_date
+    ))
+  ) %>%
     arrange(desc(filedate)) %>%
     mutate(priority = 1:n())
   priorities <- filename_priorities$priority
@@ -780,10 +818,9 @@ get_bag_meldeformular_file_date <- function(bag_filename) {
 #' This function opens a connection to the database. The password has to be entered through a prompt.
 #' @param config_file The path to the config file if it is not in the working directory.
 #' @return (DBI::DBIConnection)
-open_database_connection <- function (
-  db_instance = Sys.getenv("DB_INSTANCE", "local"), password_method = "config",
-  config_file = NA
-) {
+open_database_connection <- function(
+    db_instance = Sys.getenv("DB_INSTANCE", "local"), password_method = "config",
+    config_file = NA) {
   if (is.na(config_file)) {
     connection_data <- config::get("database")[[db_instance]]
   } else {
@@ -793,8 +830,10 @@ open_database_connection <- function (
   if (password_method == "askpass") {
     password <- askpass::askpass(paste0("Please enter the password for user \"", connection_data$username, "\":"))
   } else if (password_method == "readline") {
-    cat(paste0("Please enter the password for user \"", connection_data$username, "\" on host \"",
-               connection_data$host, "\":\n"))
+    cat(paste0(
+      "Please enter the password for user \"", connection_data$username, "\" on host \"",
+      connection_data$host, "\":\n"
+    ))
     password <- readLines(file("stdin"), n = 1L)
   } else if (password_method == "config") {
     password <- connection_data$password
@@ -834,7 +873,8 @@ iso_code_to_country_name <- function(iso_code) {
     sourcevar = iso_code,
     origin = "iso3c",
     destination = "country.name",
-    custom_match = c("KOS" = "Kosovo", 'OTHER' = "Other", 'UNKNOWN' = "Unknown", 'XXX' = 'Unknown')))
+    custom_match = c("KOS" = "Kosovo", 'OTHER' = "Other", 'UNKNOWN' = "Unknown", 'XXX' = 'Unknown')
+  ))
 }
 
 #' Guess ISO country code from English or German language country names
@@ -845,13 +885,15 @@ country_name_to_iso_code <- function(country, language = "english") {
       sourcevar = country,
       origin = "country.name",
       destination = "iso3c",
-      custom_match = c("Kosovo" = "KOS"))
+      custom_match = c("Kosovo" = "KOS")
+    )
   } else if (language == "german") {
     codes <- countrycode::countrycode(
       sourcevar = country,
       origin = "country.name.de",
       destination = "iso3c",
-      custom_match = c("Kosovo" = "KOS"))
+      custom_match = c("Kosovo" = "KOS")
+    )
   } else {
     stop(paste("Cannot translate country names from specified language:", language))
   }
@@ -865,10 +907,10 @@ country_name_to_iso_code <- function(country, language = "english") {
 #' @param sampleset_dir Directory with V-pipe's sampleset/samples.<batch>.tsv files.
 #' @return Logical vector indicating whether each of batches is complete.
 check_all_seqs_imported <- function(
-  batches,
-  samples_in_database,
-  sampleset_dir = "/Volumes/shared/covid19-pangolin/backup/sampleset",
-  verbose = T) {
+    batches,
+    samples_in_database,
+    sampleset_dir = "/Volumes/shared/covid19-pangolin/backup/sampleset",
+    verbose = T) {
   batches_are_complete <- rep(F, length(batches))
   for (i in 1:length(batches)) {
     batch <- batches[i]
@@ -876,15 +918,18 @@ check_all_seqs_imported <- function(
     if (!file.exists(sampleset_file)) {
       print(log.warn(
         msg = paste0("File ", sampleset_file, " does not exist! Cannot check whether all samples in database."),
-        fcn = paste0("utility.R", "::", "check_all_seqs_imported")))
+        fcn = paste0("utility.R", "::", "check_all_seqs_imported")
+      ))
       batches_are_complete[i] <- F
     } else {
       sampleset <- read.delim(file = sampleset_file, header = F)
       samples_not_in_database <- sampleset$V1[!(sampleset$V1 %in% samples_in_database)]
       if (length(samples_not_in_database) > 0) {
         if (verbose) {
-          warning("Some samples from batch not found in the database!\n",
-                  paste0(samples_not_in_database, collapse = "\n"))
+          warning(
+            "Some samples from batch not found in the database!\n",
+            paste0(samples_not_in_database, collapse = "\n")
+          )
         }
       } else {
         batches_are_complete[i] <- T

@@ -1,4 +1,3 @@
-
 # Load requirements
 source("R/utility.R")
 source("R/logger.R")
@@ -11,7 +10,8 @@ main <- function(args) {
   if (!has_sent_files(args)) {
     print(log.info(
       msg = "No files sent to SPSP found. Not updating table sequence_identifier.",
-      fcn = paste0(args$script_name, "::", "main")))
+      fcn = paste0(args$script_name, "::", "main")
+    ))
     return()
   }
   db_connection <- connect_to_db(args)
@@ -23,7 +23,7 @@ main <- function(args) {
 has_sent_files <- function(args) {
   sent_dir <- paste(args$outdir, "sent", sep = "/")
   sent_files <- list.files(sent_dir)
-  if(length(sent_files) > 0) {
+  if (length(sent_files) > 0) {
     return(T)
   } else {
     return(F)
@@ -34,16 +34,18 @@ has_sent_files <- function(args) {
 #' @return Database connection.
 connect_to_db <- function(args) {
   db_connection <- tryCatch(
-  {
-    print(log.info(
-      msg = "Connecting to database.",
-      fcn = paste0(args$script_name, "::", "connect_to_db")))
-    open_database_connection(db_instance = "server", config_file = "config.yml")
-  },
+    {
+      print(log.info(
+        msg = "Connecting to database.",
+        fcn = paste0(args$script_name, "::", "connect_to_db")
+      ))
+      open_database_connection(db_instance = "server", config_file = "config.yml")
+    },
     error = function(cond) {
       json_error <- log.error(
         msg = "Cannot connect to database.",
-        fcn = paste0(args$script_name, "::", "connect_to_db"))
+        fcn = paste0(args$script_name, "::", "connect_to_db")
+      )
       print(json_error)
       stop()
     }
@@ -58,38 +60,44 @@ load_metadata <- function(args) {
   if (length(metadata_file) != 1) {
     print(log.error(
       msg = paste("Cannot find sinlge expected submitted metadata file in:", submission_dir),
-      fcn = paste0(args$script_name, "::", "load_metadata")))
+      fcn = paste0(args$script_name, "::", "load_metadata")
+    ))
     stop()
   }
   metadata <- read.delim(
-    file = paste(submission_dir, metadata_file, sep = "/"), 
-    row.names = "reporting_lab_order_id")
+    file = paste(submission_dir, metadata_file, sep = "/"),
+    row.names = "reporting_lab_order_id"
+  )
   print(log.info(
     msg = paste("Found metadata file", metadata_file, "with", nrow(metadata), "entries."),
-    fcn = paste0(args$script_name, "::", "load_metadata")))
+    fcn = paste0(args$script_name, "::", "load_metadata")
+  ))
   return(metadata)
 }
 
 update_sequence_identifier <- function(db_connection, metadata, args) {
   print(log.info(
     msg = "Updating sequence_identifier table with released samples.",
-    fcn = paste0(args$script_name, "::", "update_sequence_identifier")))
+    fcn = paste0(args$script_name, "::", "update_sequence_identifier")
+  ))
   table_spec <- parse_table_specification(
     table_name = "sequence_identifier",
-    db_connection = db_connection)
+    db_connection = db_connection
+  )
   prev_table <- dplyr::tbl(db_connection, "sequence_identifier") %>%
     collect()
   newly_uploaded <- dplyr::tbl(db_connection, "consensus_sequence") %>%
-    filter(sample_name %in% !! rownames(metadata)) %>%
+    filter(sample_name %in% !!rownames(metadata)) %>%
     select(ethid, sample_name) %>%
     collect()
-  strains <- data.frame(sample_name=rownames(metadata), strain_name=metadata[,which(colnames(metadata)=="strain_name")])
+  strains <- data.frame(sample_name = rownames(metadata), strain_name = metadata[, which(colnames(metadata) == "strain_name")])
   newly_uploaded <- left_join(newly_uploaded, strains)
   joined_table <- coalesce_join(
     x = newly_uploaded %>%
       mutate(spsp_uploaded_at = Sys.Date()),
     y = prev_table,
-    by = "ethid")
+    by = "ethid"
+  )
 
   update_table(
     table_name = "sequence_identifier",
@@ -98,7 +106,8 @@ update_sequence_identifier <- function(db_connection, metadata, args) {
     append_new_rows = T,
     cols_to_update = c("sample_name", "spsp_uploaded_at"),
     key_col = "ethid",
-    table_spec = table_spec)
+    table_spec = table_spec
+  )
 }
 
 # Production arguments
