@@ -9,7 +9,10 @@ require(argparse)
 main <- function(args) {
   if (!has_sent_files(args)) {
     print(log.info(
-      msg = "No files sent to SPSP found. Not updating table sequence_identifier.",
+      msg = paste(
+        "No files sent to SPSP found.",
+        "Not updating table sequence_identifier."
+      ),
       fcn = paste0(args$script_name, "::", "main")
     ))
     return()
@@ -19,7 +22,7 @@ main <- function(args) {
   update_sequence_identifier(db_connection, metadata, args)
 }
 
-#' Return boolean for whether there's a file found in the '<outdir>/sent' directory
+#' Return whether there's a file found in the '<outdir>/sent' directory
 has_sent_files <- function(args) {
   sent_dir <- paste(args$outdir, "sent", sep = "/")
   sent_files <- list.files(sent_dir)
@@ -39,7 +42,10 @@ connect_to_db <- function(args) {
         msg = "Connecting to database.",
         fcn = paste0(args$script_name, "::", "connect_to_db")
       ))
-      open_database_connection(db_instance = "server", config_file = "config.yml")
+      open_database_connection(
+        db_instance = "server",
+        config_file = "config.yml"
+      )
     },
     error = function(cond) {
       json_error <- log.error(
@@ -55,11 +61,22 @@ connect_to_db <- function(args) {
 
 #' @return submitted sequence metadata.
 load_metadata <- function(args) {
-  submission_dir <- paste(args$outdir, "for_submission/viruses", Sys.Date(), sep = "/")
-  metadata_file <- list.files(path = submission_dir, pattern = "metadata-file.*\\.tsv")
+  submission_dir <- paste(
+    args$outdir,
+    "for_submission/viruses",
+    Sys.Date(),
+    sep = "/"
+  )
+  metadata_file <- list.files(
+    path = submission_dir,
+    pattern = "metadata-file.*\\.tsv"
+  )
   if (length(metadata_file) != 1) {
     print(log.error(
-      msg = paste("Cannot find sinlge expected submitted metadata file in:", submission_dir),
+      msg = paste(
+        "Cannot find sinlge expected submitted metadata file in:",
+        submission_dir
+      ),
       fcn = paste0(args$script_name, "::", "load_metadata")
     ))
     stop()
@@ -69,7 +86,10 @@ load_metadata <- function(args) {
     row.names = "reporting_lab_order_id"
   )
   print(log.info(
-    msg = paste("Found metadata file", metadata_file, "with", nrow(metadata), "entries."),
+    msg = paste(
+      "Found metadata file", metadata_file,
+      "with", nrow(metadata), "entries."
+    ),
     fcn = paste0(args$script_name, "::", "load_metadata")
   ))
   return(metadata)
@@ -90,7 +110,10 @@ update_sequence_identifier <- function(db_connection, metadata, args) {
     filter(sample_name %in% !!rownames(metadata)) %>%
     select(ethid, sample_name) %>%
     collect()
-  strains <- data.frame(sample_name = rownames(metadata), strain_name = metadata[, which(colnames(metadata) == "strain_name")])
+  strains <- data.frame(
+    sample_name = rownames(metadata),
+    strain_name = metadata[, which(colnames(metadata) == "strain_name")]
+  )
   newly_uploaded <- left_join(newly_uploaded, strains)
   joined_table <- coalesce_join(
     x = newly_uploaded %>%
@@ -112,8 +135,22 @@ update_sequence_identifier <- function(db_connection, metadata, args) {
 
 # Production arguments
 parser <- argparse::ArgumentParser()
-parser$add_argument("--config", type = "character", help = "Path to spsp-config.yml.", default = "spsp-config.yml")
-parser$add_argument("--outdir", type = "character", help = "Path to output files for submission.", default = paste("/mnt/pangolin/consensus_data_for_release/spsp_submission", Sys.Date(), sep = "/"))
+parser$add_argument(
+  "--config",
+  type = "character",
+  help = "Path to spsp-config.yml.",
+  default = "spsp-config.yml"
+)
+parser$add_argument(
+  "--outdir",
+  type = "character",
+  help = "Path to output files for submission.",
+  default = paste(
+    "/mnt/pangolin/consensus_data_for_release/spsp_submission",
+    Sys.Date(),
+    sep = "/"
+  )
+)
 args <- parser$parse_args()
 args[["script_name"]] <- "record_spsp_submission.R"
 
@@ -121,7 +158,8 @@ args[["script_name"]] <- "record_spsp_submission.R"
 # args <- list()
 # args[["config"]] <- "spsp-config.yml"
 # args[["outdir"]] <- "~/Downloads/test_outdir"
-# args[["outdir"]] <- "/Volumes/covid19-pangolin/pangolin/consensus_data_for_release/spsp_test"
+# args[["outdir"]] <-
+#   "/Volumes/covid19-pangolin/pangolin/consensus_data_for_release/spsp_test"
 # args[["script_name"]] <- "record_spsp_submission.R"
 
 # Run program

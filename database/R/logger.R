@@ -1,4 +1,5 @@
-# Functions to produce JSON-formatted log entries according to a simple homemade schema:
+# Functions to produce JSON-formatted log entries according to a simple
+# homemade schema:
 # {
 # type: 'log' or 'notification'
 #   timestamp:
@@ -69,11 +70,17 @@ notify.error <- function(msg, fcn) {
 #' Generate JSON-formatted log entry.
 #' @param type One of 'notification' or 'log'
 #' @param priority One of 'INFO', 'WARN', or 'ERROR'.
-#' @param fcn Character giving the calling function, e.g. "spsp_exporter.R::fetch_data".
+#' @param fcn Character giving the calling function, e.g.
+#'            "spsp_exporter.R::fetch_data".
 #' @param script_name Character giving the script name, e.g. "spsp_exporter.R".
 #' @param msg Character message, e.g. "Data not found."
-#' @return JSON-formatted log entry, e.g. {"timestamp":["Tue May 18 09:45:25 2021"],"priority":["ERROR"],"function":["spsp_exporter.R::fetch_data"],"payload":["Data not found."]}
-get_json_entry <- function(type, priority, fcn = NULL, msg, script_name = NULL) {
+#' @return JSON-formatted log entry, e.g.
+#'         {"timestamp":["Tue May 18 09:45:25 2021"],
+#'          "priority":["ERROR"],
+#'          "function":["spsp_exporter.R::fetch_data"],
+#'          "payload":["Data not found."]}
+get_json_entry <- function(type, priority, fcn = NULL,
+                           msg, script_name = NULL) {
   # Check input
   types <- c("notification", "log")
   priorities <- c('INFO', 'WARN', 'ERROR')
@@ -81,7 +88,10 @@ get_json_entry <- function(type, priority, fcn = NULL, msg, script_name = NULL) 
     get_json_entry(
       type = "log",
       priority = "ERROR",
-      msg = paste("Specified priority not one of", paste0(priorities, collapse = ", ")),
+      msg = paste(
+        "Specified priority not one of",
+        paste0(priorities, collapse = ", ")
+      ),
       script_name = script_name,
       fcn = fcn
     )

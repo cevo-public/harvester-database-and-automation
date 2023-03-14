@@ -8,7 +8,12 @@ SSH <- Sys.which("ssh")
 upload_raw_data_files <- function(samples, date, config) {
 
     log <- function(msg) {
-        print(log.info(msg=msg, fcn="trigger_upload_on_euler::upload_raw_data_files"))
+        print(
+            log.info(
+                msg=msg,
+                fcn="trigger_upload_on_euler::upload_raw_data_files"
+            )
+        )
     }
 
     max_conn <- config$max_conn

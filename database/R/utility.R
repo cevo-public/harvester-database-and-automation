@@ -1,4 +1,6 @@
-#' Find genetically similar sequences from context set to focal set of sequences.
+#' Find genetically similar sequences from context set to focal set of
+#' sequences.
+#'
 #' By exporting sequences to an alignment and then running the script.
 #' @param focal_samples List of sample names of focal sequences.
 #' @param tmpdir Directory to create for temporary files.
@@ -6,18 +8,18 @@
 #' @param clean_tmpdir If true, deletes tmpdir after function complete.
 #' @param context_samples List of sample names of context sequences.
 #' @param db_connection
-#' @return Data frame with columns sample_name and priority with one row per sequence in context set.
-get_priority <- function(
-    db_connection, focal_samples, context_samples,
-    tmpdir = "tmp/priority",
-    overwrite = F,
-    clean_tmpdir = T,
-    table = "gisaid_sequence",
-    sample_name_col = "strain",
-    seq_col = "aligned_seq",
-    date_col = "date",
-    ncovdir = "../ncov",
-    python = "python3") {
+#' @return Data frame with columns sample_name and priority with one row per
+#'         sequence in context set.
+get_priority <- function(db_connection, focal_samples, context_samples,
+                         tmpdir = "tmp/priority",
+                         overwrite = F,
+                         clean_tmpdir = T,
+                         table = "gisaid_sequence",
+                         sample_name_col = "strain",
+                         seq_col = "aligned_seq",
+                         date_col = "date",
+                         ncovdir = "../ncov",
+                         python = "python3") {
   # Set up tmpdir for temporary output
   if (dir.exists(tmpdir) & overwrite) {
     system(command = paste("rm", tmpdir))
@@ -49,7 +51,27 @@ get_priority <- function(
   )
 
   # Run priority script
-  priorities_command <- paste0(python, " ", ncovdir, "/scripts/priorities.py", " --alignment ", tmpdir, "/context.fasta", " --reference ", ncovdir, "/defaults/reference_seq.gb", " --metadata ", tmpdir, "/metadata.txt", " --focal-alignment ", tmpdir, "/focal.fasta", " --output ", tmpdir, "/priorities.txt")
+  priorities_command <- paste0(
+    python,
+    " ",
+    ncovdir,
+    "/scripts/priorities.py",
+    " --alignment ",
+    tmpdir,
+    "/context.fasta",
+    " --reference ",
+    ncovdir,
+    "/defaults/reference_seq.gb",
+    " --metadata ",
+    tmpdir,
+    "/metadata.txt",
+    " --focal-alignment ",
+    tmpdir,
+    "/focal.fasta",
+    " --output ",
+    tmpdir,
+    "/priorities.txt"
+  )
   cat("Running nextstrain priorities script with command:",
     priorities_command,
     sep = "\n"
@@ -70,14 +92,22 @@ get_priority <- function(
   return(priorities)
 }
 
-#' Find genetically similar sequences from context set to focal set of sequences.
-#' By running a modified version of the script that fetches sequenecs directly from the database.
-run_nextstrain_priority <- function(
-    focal_strains, nonfocal_strains, prefix, outdir,
-    python_path, priorities_script, reference, verbose = F,
-    focal_strain_table, context_strain_table,
-    focal_sample_name_col, context_sample_name_col,
-    focal_seq_col, context_seq_col, config_filepath = "database/config.yml") {
+#' Find genetically similar sequences from context set to focal set of
+#' sequences.
+#' By running a modified version of the script that fetches sequences directly
+#' from the database.
+run_nextstrain_priority <- function(focal_strains, nonfocal_strains,
+                                    prefix, outdir, python_path,
+                                    priorities_script,
+                                    reference,
+                                    verbose = F,
+                                    focal_strain_table,
+                                    context_strain_table,
+                                    focal_sample_name_col,
+                                    context_sample_name_col,
+                                    focal_seq_col,
+                                    context_seq_col,
+                                    config_filepath = "database/config.yml") {
   n_focal_strains <- length(focal_strains)
   n_nonfocal_strains <- length(nonfocal_strains)
 
@@ -147,8 +177,8 @@ run_nextstrain_priority <- function(
 }
 
 #' Export minimal metadata in nextstrain format.
-#' @return minimal metadata in nextstrain format. Enables e.g. run of nextstrain
-#' priorities.py and diagnostic.py scripts.
+#' @return minimal metadata in nextstrain format. Enables e.g. run of
+#' nextstrain priorities.py and diagnostic.py scripts.
 export_metadata_as_nextstrain_format <- function(
     db_connection, sample_names, metadata_outfile,
     table, sample_name_col, date_col,
@@ -246,7 +276,8 @@ get_has_frameshift_mutation <- function(gaps) {
 
 #' Generates data on frameshift deletions in a sequence.
 #' @input gaps The 'gaps' output of nextclade.
-#' @return a list of the length of each gap, named by the position of the first gap
+#' @return a list of the length of each gap, named by the position of the
+#' first gap
 get_frameshift_deletions <- function(gaps) {
   frameshifts <- list()
   if (is.na(gaps) | gaps == "") {
@@ -263,7 +294,8 @@ get_frameshift_deletions <- function(gaps) {
   return(frameshifts)
 }
 
-#' @param seqs A vector of nucleotide sequences with IUAPC characters of the same length.
+#' @param seqs A vector of nucleotide sequences with IUAPC characters of the
+#'             same length.
 #' @return The mean value of the pairwise differences between sequences in seqs.
 #' Ambiguous bases are considered, e.g. "M" (A or C) and "A" have 0 differences.
 get_mean_n_nucleotide_differences <- function(seqs, pairwise = F) {
@@ -277,7 +309,8 @@ get_mean_n_nucleotide_differences <- function(seqs, pairwise = F) {
 
 #' Coalesce join
 #' Code is adapted from https://alistaire.rbind.io/blog/coalescing-joins/.
-#' @param x Dataframe (entries in this one will be prioritized in case of duplicates).
+#' @param x Dataframe (entries in this one will be prioritized in case of
+#'          duplicates).
 #' @param y Another dataframe.
 #' @param by Key column name to join by.
 #' @return A dataframe with duplicate columns in x and y coalesced.
@@ -297,8 +330,12 @@ coalesce_join <- function(x, y, by = NULL, suffix = c(".x", ".y"),
   ))
 
   # cast to factor for dplyr::coalesce
-  joined[c(paste0(to_coalesce, suffix[1]), paste0(to_coalesce, suffix[2]))] <- apply(
-    X = joined[c(paste0(to_coalesce, suffix[1]), paste0(to_coalesce, suffix[2]))],
+  joined[
+    c(paste0(to_coalesce, suffix[1]), paste0(to_coalesce, suffix[2]))
+  ] <- apply(
+    X = joined[
+      c(paste0(to_coalesce, suffix[1]), paste0(to_coalesce, suffix[2]))
+    ],
     MARGIN = 2,
     FUN = as.factor
   )
@@ -316,15 +353,23 @@ coalesce_join <- function(x, y, by = NULL, suffix = c(".x", ".y"),
 #' @param db_connection Connection to the database.
 #' @param sample_names List of sample names in column 'sample_name'.
 #' @param seq_outfile File to write out to.
-#' @param seq_outdir Directory to write out to. If not NULL, writes one file per sample.
+#' @param seq_outdir Directory to write out to. If not NULL, writes one file
+#'        per sample.
 #' @param overwrite If true, will overwrite an existing seq_outfile.
-#' @param append If true and overwrite is F, will append to an existing seq_outfile.
-#' @param header_mapping (Optional) A named list, where values are desired headers and names are sample names.
-#' @param fail_incomplete If false, will write out a file even if not all sample_names are found in the database.
-#' @param warn_outfile (Optional) File to write out warnings to, like which sequences weren't found.
-#' @param mask_from_start (Optional) Number of sites to mask from start of alignment.
-#' @param mask_from_end (Optional) Number of sites to mask from end of alignment.
-#' @param gzip Boolean indicating whether to compress sequence file using gzip or not.
+#' @param append If true and overwrite is F, will append to an existing
+#'        seq_outfile.
+#' @param header_mapping (Optional) A named list, where values are desired
+#'        headers and names are sample names.
+#' @param fail_incomplete If false, will write out a file even if not all
+#'        sample_names are found in the database.
+#' @param warn_outfile (Optional) File to write out warnings to, like which
+#'        sequences weren't found.
+#' @param mask_from_start (Optional) Number of sites to mask from start of
+#'        alignment.
+#' @param mask_from_end (Optional) Number of sites to mask from end of
+#'        alignment.
+#' @param gzip Boolean indicating whether to compress sequence file using
+#'        gzip or not.
 export_seqs_as_fasta <- function(db_connection, sample_names,
                                  seq_outfile = NULL, seq_outdir = NULL,
                                  overwrite = F, append = F, warn_append = T,
@@ -371,7 +416,9 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
   }
 
   if (!all(sample_names %in% seq_tbl[[sample_name_col]])) {
-    missing_samples <- sample_names[!(sample_names %in% seq_tbl[[sample_name_col]])]
+    missing_samples <- sample_names[
+      !(sample_names %in% seq_tbl[[sample_name_col]])
+    ]
     if (fail_incomplete) {
       stop(paste("Some samples not found.", missing_samples, sep = "\n"))
     } else {
@@ -381,7 +428,8 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
         writeLines(missing_samples, con = warn_outfile_con, sep = "\n")
         close(warn_outfile_con)
       }
-      sample_names <- sample_names[!(sample_names %in% missing_samples)] # remove samples from list for header mapping
+      # remove samples from list for header mapping
+      sample_names <- sample_names[!(sample_names %in% missing_samples)]
     }
   }
   if (!is.null(header_mapping)) {
@@ -430,11 +478,16 @@ export_seqs_as_fasta <- function(db_connection, sample_names,
 }
 
 #' Mask start and end sites of a sequence string.
-mask_sites_in_seq_string <- function(seq_string, mask_from_start, mask_from_end, mask_char = "N") {
+mask_sites_in_seq_string <- function(seq_string, mask_from_start,
+                                     mask_from_end, mask_char = "N") {
   start_replacement <- paste0(rep(mask_char, mask_from_start), collapse = "")
   end_replacement <- paste0(rep(mask_char, mask_from_end), collapse = "")
   substr(seq_string, 1, mask_from_start) <- start_replacement
-  substr(seq_string, nchar(seq_string) - mask_from_end + 1, nchar(seq_string)) <- end_replacement
+  substr(
+    seq_string,
+    nchar(seq_string) - mask_from_end + 1,
+    nchar(seq_string)
+  ) <- end_replacement
   return(seq_string)
 }
 
@@ -442,12 +495,14 @@ mask_sites_in_seq_string <- function(seq_string, mask_from_start, mask_from_end,
 #' @param table_name The name of the table to update.
 #' @param new_table The new table to update the database table from.
 #' @param con Connection to the database.
-#' @param append_new_rows If false, will only update rows where key_col value already exists & will not add new rows.
+#' @param append_new_rows If false, will only update rows where key_col value
+#'                        already exists & will not add new rows.
 #' @param cols_to_update A vector of column names to update.
-#' @param key_col Either a character key column name or a list of character key column names.
+#' @param key_col Either a character key column name or a list of character
+#'                key column names.
 #' @return nothing, just prints a summary.
-summarize_update <- function(
-    table_name, new_table, con, append_new_rows, cols_to_update, key_col) {
+summarize_update <- function(table_name, new_table, con, append_new_rows,
+                             cols_to_update, key_col) {
   existing_keys <- unlist(dplyr::tbl(con, table_name) %>%
     select(all_of(key_col)) %>%
     collect() %>%
@@ -467,7 +522,8 @@ summarize_update <- function(
 }
 
 #' A helper function for update_table.
-#' @param key_col Either a character key column name or a list of character key column names.
+#' @param key_col Either a character key column name or a list of character
+#'                key column names.
 #' @return The where clause based on key_col as a string.
 get_key_col_sql <- function(key_col) {
   if (length(key_col) == 1) {
@@ -491,18 +547,22 @@ get_key_col_sql <- function(key_col) {
   return(key_col_sql)
 }
 
-#' Append new rows to a table based on key_col and update values in cols_to_update in all rows.
+#' Append new rows to a table based on key_col and update values in cols_to_
+#' update in all rows.
 #' @param table_name The name of the table to update.
 #' @param new_table The new table to update the database table from.
 #' @param con Connection to the database.
-#' @param append_new_rows If false, will only update rows where key_col value already exists & will not add new rows.
+#' @param append_new_rows If false, will only update rows where key_col value
+#'                        already exists & will not add new rows.
 #' @param cols_to_update A vector of column names to update.
-#' @param key_col Either a character key column name or a list of character key column names.
+#' @param key_col Either a character key column name or a list of character
+#'                key column names.
 #' @param table_spec Data frame with table column type specifications.
-#' @param close_con If false, leaves connection to database 'con' open so that this function can be called in a loop.
-update_table <- function(
-    table_name, new_table, con, append_new_rows = T, cols_to_update, key_col,
-    table_spec, close_con = T, run_summarize_update = T, verbose = F) {
+#' @param close_con If false, leaves connection to database 'con' open so that
+#'                  this function can be called in a loop.
+update_table <- function(table_name, new_table, con, append_new_rows = T,
+                         cols_to_update, key_col, table_spec, close_con = T,
+                         run_summarize_update = T, verbose = F) {
   if (run_summarize_update) {
     summarize_update(
       table_name, new_table, con, append_new_rows, cols_to_update, key_col
@@ -517,7 +577,8 @@ update_table <- function(
   }
   field_types <- table_spec$type
   names(field_types) <- table_spec$name
-  field_types <- field_types[names(field_types) %in% colnames(new_table)] # only provide field types for columns to be imported to staging table
+  field_types <- field_types[names(field_types) %in% colnames(new_table)]
+    # only provide field types for columns to be imported to staging table
   if (verbose) {
     print(paste("Writing staging table", staging_table_name, "to", con))
     print(paste("Field types are:", field_types))
@@ -532,8 +593,13 @@ update_table <- function(
   key_col_sql <- get_key_col_sql(key_col)
   if (append_new_rows) {
     append_sql <- paste(
-      "INSERT INTO", table_name, "(", paste0(c(key_col, cols_to_update), collapse = ", "), ")",
-      "SELECT", paste0(c(key_col, paste0("s.", cols_to_update)), collapse = ", "), "FROM", staging_table_name, "s",
+      "INSERT INTO", table_name,
+      "(",
+      paste0(c(key_col, cols_to_update), collapse = ", "),
+      ")",
+      "SELECT",
+      paste0(c(key_col, paste0("s.", cols_to_update)), collapse = ", "),
+      "FROM", staging_table_name, "s",
       "WHERE NOT EXISTS",
       "(SELECT 1 FROM", table_name, "t",
       key_col_sql,
@@ -546,7 +612,10 @@ update_table <- function(
   # Update values in table based on values in staging table
   update_equalities <- c()
   for (col in cols_to_update) {
-    update_equalities <- c(update_equalities, paste0(col, " = ", paste("s.", col, sep = "")))
+    update_equalities <- c(
+      update_equalities,
+      paste0(col, " = ", paste("s.", col, sep = ""))
+    )
   }
   update_sql <- paste(
     "UPDATE", table_name, "t",
@@ -564,21 +633,28 @@ update_table <- function(
 }
 
 #' Parse ethid from strain names given by GISAID.
-#' @param gisaid_strain The virus name on GISAID. Format should be 'Switzerland/<Canton code>-ETHZ-<ethid>/<Year>'
+#' @param gisaid_strain The virus name on GISAID. Format should be
+#'                      'Switzerland/<Canton code>-ETHZ-<ethid>/<Year>'
 #' @return The ethid (an integer)
 get_ethid_from_gisaid_strain <- function(gisaid_strain) {
   if (!grepl(x = gisaid_strain, pattern = "ETHZ")) {
     warning(paste(gisaid_strain, "not recognized as being from ETHZ returning NA for ethid"))
     return(NA)
   }
-  ethid <- strsplit(x = gisaid_strain, split = "-")[[1]][length(strsplit(x = gisaid_strain, split = "-")[[1]])] # take everything after last "-"
-  ethid <- strsplit(x = ethid, split = "/")[[1]][1] # take everything before first "/"
-  ethid <- gsub(x = ethid, pattern = "plus", replacement = "") # remove suffix "plus" if present
+  # take everything after last "-"
+  ethid <- strsplit(x = gisaid_strain, split = "-")[[1]][
+    length(strsplit(x = gisaid_strain, split = "-")[[1]])
+  ]
+  # take everything before first "/"
+  ethid <- strsplit(x = ethid, split = "/")[[1]][1]
+  # remove suffix "plus" if present
+  ethid <- gsub(x = ethid, pattern = "plus", replacement = "")
   ethid <- as.numeric(ethid)
   return(ethid)
 }
 
-#' Parse ethid from sample names given by the sequencing center (how sequencing results are labeled).
+#' Parse ethid from sample names given by the sequencing center (how
+#' sequencing results are labeled).
 #' The ETHID is assumed to be the first 6 or 8 digits in the sample name,
 #' so long as this is followed by an underscore or end of sample name and is
 #' present in either the ethid (6-digits) or sample_number (8-digits) column in
@@ -605,27 +681,51 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
     if (in_vt_once) {
       return(ethid)
     } else {
-      warning(paste(ethid, "found 0 or > 1 times in the Viollier test table column 'ethid'. Invalid ETHID."))
+      warning(
+        paste(
+          ethid,
+          "found 0 or > 1 times in the Viollier test table column 'ethid'.",
+          " Invalid ETHID."
+        )
+      )
       return(NA)
     }
-  } else if (is_sample_number_format) { # Check if sample number is in the test_metadata table test_id field
+  } else if (is_sample_number_format) {
+    # Check if sample number is in the test_metadata table test_id field
     ethid <- unlist(strsplit(sample_name, split = "_"))[1]
     test_metadata <- dplyr::tbl(db_connection, "test_metadata") %>%
       select(test_id) %>%
       collect()
     in_vt_once <- nrow(
-      test_metadata %>% mutate(sample_number = unlist(lapply(strsplit(test_metadata$test_id, "/"), function(x) x[2]))) %>%
+      test_metadata %>%
+        mutate(
+          sample_number = unlist(
+            lapply(
+              strsplit(test_metadata$test_id, "/"), function(x) x[2])
+            )
+          ) %>%
         filter(sample_number == !!ethid) %>%
         collect()
     ) == 1
     if (in_vt_once) {
       return(ethid)
     } else {
-      warning(paste(ethid, "found 0 or > 1 times in the Viollier test table column 'sample_number'. Invalid ETHID."))
+      warning(
+        paste(
+          ethid,
+          "found 0 or > 1 times in the Viollier test table column ",
+          "'sample_number'. Invalid ETHID."))
       return(NA)
     }
-  } else { # Control sample, sample from ZRH, EAWAG sample, other non-standard sample
-    warning(paste("ethid not found in sample name:", sample_name, "\n", sep = " "))
+  } else {
+    # Control sample, sample from ZRH, EAWAG sample, other non-standard sample
+    warning(
+      paste(
+        "ethid not found in sample name:",
+        sample_name,
+        "\n",
+        sep = " ")
+      )
     return(NA)
   }
 }
@@ -634,12 +734,20 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
 #' @param table The data table to be formatted.
 #' @param table_name The table name in the sql_specification file.
 #' @param db_connection Connection to the database.
-#' @param type_prefix Normally the script tries to guess what custom types for this table would be named. But you can also specify a prefix here.
+#' @param type_prefix Normally the script tries to guess what custom types
+#'                    for this table would be named. But you can also specify
+#'                    a prefix here.
 #' @return A data table coerced to the types specified in the database schema.
-enforce_sql_spec <- function(
-    table, table_name, db_connection, type_prefix = NULL, n_cores = 1, verbose = F) {
-  table_spec <- parse_table_specification(table_name = table_name, db_connection = db_connection)
-  col_spec <- parse_column_specification(table_spec = table_spec, db_connection = db_connection)
+enforce_sql_spec <- function(table, table_name, db_connection,
+                             type_prefix = NULL, n_cores = 1, verbose = F) {
+  table_spec <- parse_table_specification(
+    table_name = table_name,
+    db_connection = db_connection
+  )
+  col_spec <- parse_column_specification(
+    table_spec = table_spec,
+    db_connection = db_connection
+  )
   for (colname in colnames(table)) {
     if (verbose) {
       print(paste("Checking for special column type for column", colname))
@@ -652,12 +760,24 @@ enforce_sql_spec <- function(
     col_spec_name <- col_spec_names[which(col_spec_names %in% names(col_spec))]
     if (length(col_spec_name) > 0) {
       if (verbose) {
-        print(paste("Found special column type", col_spec_name, "for column", colname))
+        print(
+          paste(
+            "Found special column type", col_spec_name,
+            "for column", colname
+          )
+        )
       }
       unique_vals <- unique(table[[colname]])
       unknown_vals <- unique_vals[!(unique_vals %in% col_spec[[col_spec_name]])]
       if (length(unknown_vals) > 0) {
-        stop(cat("Unkown values ", paste0(unknown_vals, collapse = ", "), " in column ", colname))
+        stop(
+          cat(
+            "Unkown values ",
+            paste0(unknown_vals, collapse = ", "),
+            " in column ",
+            colname
+          )
+        )
       }
     } else {
       if (verbose) {
@@ -682,7 +802,9 @@ enforce_sql_spec <- function(
 #' Parse table specifications given in init.sql file
 #' @param table_name The table name in the sql_specification file.
 #' @param db_connection Connection to the database.
-#' @return A data frame with columns 'name' for column name, 'type' for column type, and 'unique' for whether the column should be unique or not
+#' @return A data frame with columns 'name' for column name, 'type' for
+#'         column type, and 'unique' for whether the column should be unique
+#'         or not
 parse_table_specification <- function(table_name, db_connection) {
   # Get column types
   sql <- paste0("SELECT column_name, udt_name FROM
@@ -713,11 +835,15 @@ parse_table_specification <- function(table_name, db_connection) {
 }
 
 #' Parse column specifications given in init.sql file
-#' @param table_spec The table specification. Output of parse_table_specification function.
-#' @param table_name The table name in the sql_specification file. Must provide either table_spec or table_name.
+#' @param table_spec The table specification. Output of parse_table_
+#'                   specification function.
+#' @param table_name The table name in the sql_specification file.
+#'                   Must provide either table_spec or table_name.
 #' @param db_connection Connection to the database.
-#' @return A named list, where names are column names and values are values the column can take.
-parse_column_specification <- function(table_spec = NULL, table_name = NULL, db_connection) {
+#' @return A named list, where names are column names and values are values
+#'         the column can take.
+parse_column_specification <- function(table_spec = NULL, table_name = NULL,
+                                       db_connection) {
   if (is.null(table_spec)) {
     table_spec <- parse_table_specification(
       table_name = table_name, db_connection = db_connection
@@ -737,7 +863,8 @@ parse_column_specification <- function(table_spec = NULL, table_name = NULL, db_
 }
 
 #' Enforce correct data type for a column
-#' @param type The column type as a character value. One of 'text', 'date', 'integer', 'float4', 'float8', 'boolean'.
+#' @param type The column type as a character value. One of 'text', 'date',
+#'             'integer', 'float4', 'float8', 'boolean'.
 #' @return Values transformed to correct type.
 enforce_column_type <- function(colname, values, type, n_cores = 1) {
   if (type == "text") {
@@ -745,7 +872,17 @@ enforce_column_type <- function(colname, values, type, n_cores = 1) {
   } else if (type == "int4") {
     coerceion_function <- as.integer
   } else if (type == "date") {
-    return(as.character(unlist(parallel::mclapply(X = values, FUN = standardize_date, mc.cores = n_cores))))
+    return(
+      as.character(
+        unlist(
+          parallel::mclapply(
+            X = values,
+            FUN = standardize_date,
+            mc.cores = n_cores
+          )
+        )
+      )
+    )
   } else if (type == "bool") {
     coerceion_function <- as.logical
   } else if (type == "float4" | type == "float8") {
@@ -769,7 +906,8 @@ enforce_column_type <- function(colname, values, type, n_cores = 1) {
   return(coerced_values)
 }
 
-#' Convert input data to date data type. Errors if cannot be interpreted as a date.
+#' Convert input data to date data type. Errors if cannot be interpreted
+#' as a date.
 #' Also check if the resulting date falls between Feb. 24 2020 and current date.
 #' @return date
 standardize_date <- function(date) {
@@ -781,9 +919,15 @@ standardize_date <- function(date) {
     }
   )
   if (!is.na(formatted_date)) {
-    range_check <- formatted_date >= as.Date("2020-02-24") & formatted_date <= as.Date(Sys.Date())
+    range_check <- formatted_date >= as.Date("2020-02-24") &
+                   formatted_date <= as.Date(Sys.Date())
     if (!range_check) {
-      warning(paste("Date", date, "was interpreted as", formatted_date, "which is out of reasonable range. Replacing value with NA"))
+      warning(
+        paste(
+          "Date", date, "was interpreted as", formatted_date,
+          "which is out of reasonable range. Replacing value with NA"
+        )
+      )
       return(NA)
     }
   }
@@ -791,7 +935,8 @@ standardize_date <- function(date) {
 }
 
 #' Get precedence order of data given multiple data files
-#' @return A named list, where names are unique filenames and values are precendence order of data
+#' @return A named list, where names are unique filenames and values are
+#'         precendence order of data
 getfilename_priority_bag_meldeformular <- function(filenames) {
   filename_priorities <- data.frame(
     filename = unique(filenames),
@@ -815,25 +960,37 @@ get_bag_meldeformular_file_date <- function(bag_filename) {
   return(file_date)
 }
 
-#' This function opens a connection to the database. The password has to be entered through a prompt.
-#' @param config_file The path to the config file if it is not in the working directory.
+#' This function opens a connection to the database. The password has to be
+#' entered through a prompt.
+#' @param config_file The path to the config file if it is not in the
+#'                    working directory.
 #' @return (DBI::DBIConnection)
 open_database_connection <- function(
-    db_instance = Sys.getenv("DB_INSTANCE", "local"), password_method = "config",
+    db_instance = Sys.getenv("DB_INSTANCE", "local"),
+    password_method = "config",
     config_file = NA) {
   if (is.na(config_file)) {
     connection_data <- config::get("database")[[db_instance]]
   } else {
-    connection_data <- config::get("database", file = config_file)[[db_instance]]
+    connection_data <- config::get("database", file=config_file)[[db_instance]]
   }
 
   if (password_method == "askpass") {
-    password <- askpass::askpass(paste0("Please enter the password for user \"", connection_data$username, "\":"))
+    password <- askpass::askpass(
+      paste0(
+        "Please enter the password for user \"",
+        connection_data$username,
+        "\":"
+      )
+    )
   } else if (password_method == "readline") {
-    cat(paste0(
-      "Please enter the password for user \"", connection_data$username, "\" on host \"",
-      connection_data$host, "\":\n"
-    ))
+    cat(
+      paste0(
+        "Please enter the password for user \"",
+        connection_data$username, "\" on host \"",
+        connection_data$host, "\":\n"
+      )
+    )
     password <- readLines(file("stdin"), n = 1L)
   } else if (password_method == "config") {
     password <- connection_data$password
@@ -859,7 +1016,10 @@ get_standardized_iso_country <- function(iso_country, db_connection) {
   unknown_codes <- iso_country[!(iso_country %in% known_codes)]
   if (length(unknown_codes) > 0) {
     warning(
-      "These codes are not in the country table and will be overwritten with 'XXX': ",
+      paste(
+        "These codes are not in the country table ",
+        "and will be overwritten with 'XXX': "
+      ),
       paste0(unique(unknown_codes), collapse = ", ")
     )
   }
@@ -873,7 +1033,12 @@ iso_code_to_country_name <- function(iso_code) {
     sourcevar = iso_code,
     origin = "iso3c",
     destination = "country.name",
-    custom_match = c("KOS" = "Kosovo", 'OTHER' = "Other", 'UNKNOWN' = "Unknown", 'XXX' = 'Unknown')
+    custom_match = c(
+      "KOS" = "Kosovo",
+      'OTHER' = "Other",
+      'UNKNOWN' = "Unknown",
+      'XXX' = 'Unknown'
+    )
   ))
 }
 
@@ -895,16 +1060,24 @@ country_name_to_iso_code <- function(country, language = "english") {
       custom_match = c("Kosovo" = "KOS")
     )
   } else {
-    stop(paste("Cannot translate country names from specified language:", language))
+    stop(
+      paste(
+        "Cannot translate country names from specified language:",
+        language
+      )
+    )
   }
   return(codes)
 }
 
-#' Given a list of sequencing batches, check the list of sequences in the database
-#' against the list of samples in V-pipe's sampleset/samples.<batch>.tsv file.
+#' Given a list of sequencing batches, check the list of sequences
+#' in the database against the list of samples in V-pipe's
+#' sampleset/samples.<batch>.tsv file.
 #' @param batches List of batch names, e.g. c('20210326_H5YL5DRXY')
-#' @param samples_in_database List of sample names from database to check against.
-#' @param sampleset_dir Directory with V-pipe's sampleset/samples.<batch>.tsv files.
+#' @param samples_in_database List of sample names from database to check
+#'                            against.
+#' @param sampleset_dir Directory with V-pipe's sampleset/samples.<batch>.tsv
+#'                      files.
 #' @return Logical vector indicating whether each of batches is complete.
 check_all_seqs_imported <- function(
     batches,
@@ -917,13 +1090,18 @@ check_all_seqs_imported <- function(
     sampleset_file <- paste0(sampleset_dir, "/samples.", batch, ".tsv")
     if (!file.exists(sampleset_file)) {
       print(log.warn(
-        msg = paste0("File ", sampleset_file, " does not exist! Cannot check whether all samples in database."),
+        msg = paste0(
+          "File ", sampleset_file,
+          " does not exist! Cannot check whether all samples in database."
+        ),
         fcn = paste0("utility.R", "::", "check_all_seqs_imported")
       ))
       batches_are_complete[i] <- F
     } else {
       sampleset <- read.delim(file = sampleset_file, header = F)
-      samples_not_in_database <- sampleset$V1[!(sampleset$V1 %in% samples_in_database)]
+      samples_not_in_database <- sampleset$V1[
+        !(sampleset$V1 %in% samples_in_database)
+      ]
       if (length(samples_not_in_database) > 0) {
         if (verbose) {
           warning(
