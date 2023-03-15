@@ -2,6 +2,7 @@
 #' sequences.
 #'
 #' By exporting sequences to an alignment and then running the script.
+#'
 #' @param focal_samples List of sample names of focal sequences.
 #' @param tmpdir Directory to create for temporary files.
 #' @param overwrite If true, deletes existing tmpdir and its contents.
@@ -94,6 +95,7 @@ get_priority <- function(db_connection, focal_samples, context_samples,
 
 #' Find genetically similar sequences from context set to focal set of
 #' sequences.
+#'
 #' By running a modified version of the script that fetches sequences directly
 #' from the database.
 run_nextstrain_priority <- function(focal_strains, nonfocal_strains,
@@ -177,6 +179,7 @@ run_nextstrain_priority <- function(focal_strains, nonfocal_strains,
 }
 
 #' Export minimal metadata in nextstrain format.
+#'
 #' @return minimal metadata in nextstrain format. Enables e.g. run of
 #' nextstrain priorities.py and diagnostic.py scripts.
 export_metadata_as_nextstrain_format <- function(
@@ -219,7 +222,7 @@ get_read_distribution <- function(
       )
     )
 
-  # See what the raw reads are at this position
+  # See what the raw reads are at this position.
   read_file <- unlist(readfile_info$readfile)
   print(read_file)
   read_con <- gzfile(read_file, 'rt')
@@ -233,7 +236,7 @@ get_read_distribution <- function(
     select(seq) %>%
     collect
 
-  # See what the base calls are
+  # See what the base calls are.
   pos_seq_chars <- toupper(unlist(strsplit(
     x = unlist(readfile_info$seq), split = ""
   )))[pos_list + 1]
@@ -255,6 +258,7 @@ get_read_distribution <- function(
 }
 
 #' Returns whether a sequence has one or more frameshift deletions.
+#'
 #' @input gaps The 'gaps' output of nextclade.
 #' @return Logical, whether the gaps include any of length not divisible by 3.
 get_has_frameshift_mutation <- function(gaps) {
@@ -275,6 +279,7 @@ get_has_frameshift_mutation <- function(gaps) {
 }
 
 #' Generates data on frameshift deletions in a sequence.
+#'
 #' @input gaps The 'gaps' output of nextclade.
 #' @return a list of the length of each gap, named by the position of the
 #' first gap
@@ -308,7 +313,9 @@ get_mean_n_nucleotide_differences <- function(seqs, pairwise = F) {
 }
 
 #' Coalesce join
+#'
 #' Code is adapted from https://alistaire.rbind.io/blog/coalescing-joins/.
+#'
 #' @param x Dataframe (entries in this one will be prioritized in case of
 #'          duplicates).
 #' @param y Another dataframe.
@@ -350,6 +357,7 @@ coalesce_join <- function(x, y, by = NULL, suffix = c(".x", ".y"),
 }
 
 #' Export sequences from table "consensus_sequence" to fasta file.
+#'
 #' @param db_connection Connection to the database.
 #' @param sample_names List of sample names in column 'sample_name'.
 #' @param seq_outfile File to write out to.
@@ -492,6 +500,7 @@ mask_sites_in_seq_string <- function(seq_string, mask_from_start,
 }
 
 #' Report what changes will actually be made by update_table.
+#'
 #' @param table_name The name of the table to update.
 #' @param new_table The new table to update the database table from.
 #' @param con Connection to the database.
@@ -522,6 +531,7 @@ summarize_update <- function(table_name, new_table, con, append_new_rows,
 }
 
 #' A helper function for update_table.
+#'
 #' @param key_col Either a character key column name or a list of character
 #'                key column names.
 #' @return The where clause based on key_col as a string.
@@ -549,6 +559,7 @@ get_key_col_sql <- function(key_col) {
 
 #' Append new rows to a table based on key_col and update values in cols_to_
 #' update in all rows.
+#'
 #' @param table_name The name of the table to update.
 #' @param new_table The new table to update the database table from.
 #' @param con Connection to the database.
@@ -569,7 +580,7 @@ update_table <- function(table_name, new_table, con, append_new_rows = T,
     )
   }
 
-  # create staging table
+  # Create staging table.
   staging_table_name <- paste0(table_name, "_staging")
   DBI::dbBegin(con)
   if (DBI::dbExistsTable(con, staging_table_name)) {
@@ -589,7 +600,7 @@ update_table <- function(table_name, new_table, con, append_new_rows = T,
     row.names = FALSE
   )
 
-  # Append columns from staging for rows that only exist in staging
+  # Append columns from staging for rows that only exist in staging.
   key_col_sql <- get_key_col_sql(key_col)
   if (append_new_rows) {
     append_sql <- paste(
@@ -609,7 +620,7 @@ update_table <- function(table_name, new_table, con, append_new_rows = T,
     DBI::dbClearResult(res)
   }
 
-  # Update values in table based on values in staging table
+  # Update values in table based on values in staging table.
   update_equalities <- c()
   for (col in cols_to_update) {
     update_equalities <- c(
@@ -633,6 +644,7 @@ update_table <- function(table_name, new_table, con, append_new_rows = T,
 }
 
 #' Parse ethid from strain names given by GISAID.
+#'
 #' @param gisaid_strain The virus name on GISAID. Format should be
 #'                      'Switzerland/<Canton code>-ETHZ-<ethid>/<Year>'
 #' @return The ethid (an integer)
@@ -655,6 +667,7 @@ get_ethid_from_gisaid_strain <- function(gisaid_strain) {
 
 #' Parse ethid from sample names given by the sequencing center (how
 #' sequencing results are labeled).
+#'
 #' The ETHID is assumed to be the first 6 or 8 digits in the sample name,
 #' so long as this is followed by an underscore or end of sample name and is
 #' present in either the ethid (6-digits) or sample_number (8-digits) column in
@@ -691,7 +704,7 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
       return(NA)
     }
   } else if (is_sample_number_format) {
-    # Check if sample number is in the test_metadata table test_id field
+    # Check if sample number is in the test_metadata table test_id field.
     ethid <- unlist(strsplit(sample_name, split = "_"))[1]
     test_metadata <- dplyr::tbl(db_connection, "test_metadata") %>%
       select(test_id) %>%
@@ -718,7 +731,7 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
       return(NA)
     }
   } else {
-    # Control sample, sample from ZRH, EAWAG sample, other non-standard sample
+    # control sample, sample from ZRH, EAWAG sample, other non-standard sample
     warning(
       paste(
         "ethid not found in sample name:",
@@ -731,6 +744,7 @@ get_ethid_from_sample_name <- function(sample_name, db_connection) {
 }
 
 #' Enforce table specifications given in init.sql file
+#'
 #' @param table The data table to be formatted.
 #' @param table_name The table name in the sql_specification file.
 #' @param db_connection Connection to the database.
@@ -799,7 +813,8 @@ enforce_sql_spec <- function(table, table_name, db_connection,
   return(table)
 }
 
-#' Parse table specifications given in init.sql file
+#' Parse table specifications given in init.sql file.
+#'
 #' @param table_name The table name in the sql_specification file.
 #' @param db_connection Connection to the database.
 #' @return A data frame with columns 'name' for column name, 'type' for
@@ -834,7 +849,8 @@ parse_table_specification <- function(table_name, db_connection) {
   return(table_spec)
 }
 
-#' Parse column specifications given in init.sql file
+#' Parse column specifications given in init.sql file.
+#'
 #' @param table_spec The table specification. Output of parse_table_
 #'                   specification function.
 #' @param table_name The table name in the sql_specification file.
@@ -862,7 +878,8 @@ parse_column_specification <- function(table_spec = NULL, table_name = NULL,
   return(col_spec)
 }
 
-#' Enforce correct data type for a column
+#' Enforce correct data type for a column.
+#'
 #' @param type The column type as a character value. One of 'text', 'date',
 #'             'integer', 'float4', 'float8', 'boolean'.
 #' @return Values transformed to correct type.
@@ -908,7 +925,10 @@ enforce_column_type <- function(colname, values, type, n_cores = 1) {
 
 #' Convert input data to date data type. Errors if cannot be interpreted
 #' as a date.
-#' Also check if the resulting date falls between Feb. 24 2020 and current date.
+#'
+#' Also check if the resulting date falls between Feb. 24 2020 and current
+#' date.
+#'
 #' @return date
 standardize_date <- function(date) {
   formatted_date <- tryCatch(
@@ -935,8 +955,9 @@ standardize_date <- function(date) {
 }
 
 #' Get precedence order of data given multiple data files
+#'
 #' @return A named list, where names are unique filenames and values are
-#'         precendence order of data
+#' precendence order of data
 getfilename_priority_bag_meldeformular <- function(filenames) {
   filename_priorities <- data.frame(
     filename = unique(filenames),
@@ -962,6 +983,7 @@ get_bag_meldeformular_file_date <- function(bag_filename) {
 
 #' This function opens a connection to the database. The password has to be
 #' entered through a prompt.
+#'
 #' @param config_file The path to the config file if it is not in the
 #'                    working directory.
 #' @return (DBI::DBIConnection)
@@ -1006,7 +1028,8 @@ open_database_connection <- function(
   return(db_connection)
 }
 
-#' Check if iso code is in country table. Unknown codes get overwritten
+#' Check if iso code is in country table. Unknown codes get overwritten.
+#'
 #' @param iso_country ISO country code.
 #' @param db_connection
 #' @return iso_country if code is in country table, 'XXX' otherwise
@@ -1027,7 +1050,7 @@ get_standardized_iso_country <- function(iso_country, db_connection) {
   return(iso_country)
 }
 
-#' Convert iso codes to English language country names
+#' Convert iso codes to English language country names.
 iso_code_to_country_name <- function(iso_code) {
   return(countrycode::countrycode(
     sourcevar = iso_code,
@@ -1043,6 +1066,7 @@ iso_code_to_country_name <- function(iso_code) {
 }
 
 #' Guess ISO country code from English or German language country names
+#'
 #' @param language 'english' if country is in English, 'german' if in German
 country_name_to_iso_code <- function(country, language = "english") {
   if (language == "english") {
@@ -1073,6 +1097,7 @@ country_name_to_iso_code <- function(country, language = "english") {
 #' Given a list of sequencing batches, check the list of sequences
 #' in the database against the list of samples in V-pipe's
 #' sampleset/samples.<batch>.tsv file.
+#'
 #' @param batches List of batch names, e.g. c('20210326_H5YL5DRXY')
 #' @param samples_in_database List of sample names from database to check
 #'                            against.

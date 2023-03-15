@@ -1,4 +1,3 @@
-# Load requirements
 source("R/utility.R")
 source("R/logger.R")
 require(dplyr)
@@ -34,7 +33,8 @@ has_sent_files <- function(args) {
 }
 
 #' Connect to database.
-#' @return Database connection.
+#'
+#' @return database connection
 connect_to_db <- function(args) {
   db_connection <- tryCatch(
     {
@@ -59,7 +59,7 @@ connect_to_db <- function(args) {
   return(db_connection)
 }
 
-#' @return submitted sequence metadata.
+#' @return submitted sequence metadata
 load_metadata <- function(args) {
   submission_dir <- paste(
     args$outdir,
@@ -96,10 +96,12 @@ load_metadata <- function(args) {
 }
 
 update_sequence_identifier <- function(db_connection, metadata, args) {
+
   print(log.info(
     msg = "Updating sequence_identifier table with released samples.",
     fcn = paste0(args$script_name, "::", "update_sequence_identifier")
   ))
+
   table_spec <- parse_table_specification(
     table_name = "sequence_identifier",
     db_connection = db_connection
@@ -133,7 +135,7 @@ update_sequence_identifier <- function(db_connection, metadata, args) {
   )
 }
 
-# Production arguments
+
 parser <- argparse::ArgumentParser()
 parser$add_argument(
   "--config",
@@ -154,13 +156,4 @@ parser$add_argument(
 args <- parser$parse_args()
 args[["script_name"]] <- "record_spsp_submission.R"
 
-# Test arguments
-# args <- list()
-# args[["config"]] <- "spsp-config.yml"
-# args[["outdir"]] <- "~/Downloads/test_outdir"
-# args[["outdir"]] <-
-#   "/Volumes/covid19-pangolin/pangolin/consensus_data_for_release/spsp_test"
-# args[["script_name"]] <- "record_spsp_submission.R"
-
-# Run program
 main(args = args)

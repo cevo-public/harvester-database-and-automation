@@ -68,6 +68,7 @@ notify.error <- function(msg, fcn) {
 }
 
 #' Generate JSON-formatted log entry.
+#'
 #' @param type One of 'notification' or 'log'
 #' @param priority One of 'INFO', 'WARN', or 'ERROR'.
 #' @param fcn Character giving the calling function, e.g.
@@ -112,7 +113,7 @@ get_json_entry <- function(type, priority, fcn = NULL,
     )
   }
 
-  # Create log entry
+  # Create log entry.
   entry <- list(
     "timestamp" = get_timestamp(),
     "type" = type,
@@ -127,6 +128,7 @@ get_json_entry <- function(type, priority, fcn = NULL,
 }
 
 #' Generate a timestamp to be used in log entries.
+#'
 #' @return Character timestamp, e.g. "Tue May 18 09:37:44 2021".
 get_timestamp <- function() {
   stamp <- timestamp(prefix = "", suffix = "", quiet = T)
@@ -134,6 +136,7 @@ get_timestamp <- function() {
 }
 
 #' Format a dataframe for log message.
+#'
 #' @param dataframe A dataframe containing information to log.
 #' @return Character.
 format_dataframe_for_log <- function(dataframe) {
