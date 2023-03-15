@@ -4,13 +4,17 @@
 /data/
 /R/
 
-# Run-time artifacts
-/spsp/
-/vpipe/
+# Run-time artifacts in local folder
+/spsp/*
+!/spsp/.gitkeep
+
+# Run-time artifacts in container
+/vpipe/*
 /config.yml
 /harvester-config.yml
 /spsp-config.yml
 
 # Secrets
-/identities/
+/identities/*
+!/identities/.gitkeep
 /config/env_*.*
