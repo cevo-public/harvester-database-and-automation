@@ -6,6 +6,10 @@ files in the required format and folder structure for submission to the
 Swiss Pathogen Surveillance Platform ([SPSP]). Finally runs SPSP's
 [Transfer Tool] to submit the new results to their SFTP server.
 
+Note that this service was never deployed in production. A previous
+iteration of the container was run manually as needed. It has not been
+extensively tested since then, so errors are expected at run-time.
+
 [SPSP]: https://spsp.ch
 [Transfer Tool]: https://gitlab.sib.swiss/clinbio/spsp-ng/transfer-tool
 
@@ -95,15 +99,14 @@ such in the database.
 
 To develop and test locally:
 * Make a copy of the `database` folder in this folder here.
-* Create a folder named `identities` and copy the necessary SSH private
-  key files into it.
 * Set the environment variables appropriately, according to the
   description above. Find templates in the `config` folder.
+* Copy the necessary SSH private keys to the `identities` folder.
 * Make sure you have [VS Code] installed as well as its [Dev Containers]
   extension.
 * Open this very folder in VS Code, e.g. by running `code .` in it.
-  Just make you it inherits the environment in which the variables are
-  defined.
+  (It needs to inherit the environment in which the variables were
+  defined.)
 * You will be prompted to "Reopen in Container".
 * Inside the container, run `create_configs.sh` and `vpipe_mount.sh`.
 
