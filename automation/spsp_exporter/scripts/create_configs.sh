@@ -28,15 +28,14 @@ do
 	echo "  - $RECIPIENT" >>/app/harvester-config.yml
 done
 
-cat >>/app/spsp-config.yml <<END
-raw_data_upload:
-  server: $VPIPE_HOST
-  user: $VPIPE_USER
-  uploads_folder: $VPIPE_ROOT/working/uploads
-  private_key_euler: /app/identities/$RAWDATA_IDENTITY
-  passphrase: $RAWDATA_PASSPHRASE
-  max_conn: 10
-  max_samples_per_call: 200
+cat >/app/raw-data-upload.yml <<END
+server: $VPIPE_HOST
+user: $VPIPE_USER
+uploads_folder: $VPIPE_ROOT/working/uploads
+private_key_euler: /app/identities/$RAWDATA_IDENTITY
+passphrase: $RAWDATA_PASSPHRASE
+max_conn: 10
+max_samples_per_call: 200
 END
 
 # Make sure SSH identity files (private keys) have correct access mode.

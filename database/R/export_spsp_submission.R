@@ -8,7 +8,7 @@
 
 source("R/utility.R")
 source("R/logger.R")
-source("R/trigger_upload_on_euler.R")
+source("R/trigger_raw_data_upload.R")
 
 require(dplyr)
 require(yaml)
@@ -24,11 +24,7 @@ main <- function(args) {
   db_output <- get_samples_to_release(db_connection, args)
   if (length(db_output$samples) > 0) {
     config <- read_yaml(file = args$config)
-    raw_data_file_names <- upload_raw_data_files(
-      db_output$samples,
-      date,
-      config$raw_data_upload
-    )
+    raw_data_file_names <- upload_raw_data(db_output$samples, date)
     metadata_list <- get_sample_metadata(
       db_connection,
       args,
@@ -1319,63 +1315,6 @@ write_out_files <- function(metadata, frameshifts_tbl, batches_summary,
   )
 }
 
-check_raw_data_upload_config <- function(config) {
-
-  required <- c(
-    "server", "user", "uploads_folder", "private_key_euler",
-    "passphrase", "max_conn", "max_samples_per_call"
-  )
-
-  missing <- setdiff(required, names(config))
-  unknown <- setdiff(names(config), required)
-
-  errors <- 0
-  if (length(missing) > 0) {
-    cat(paste(c(
-      "error: the following entries in config are missing:", missing, "\n"
-    )))
-    errors <- errors + 1
-  }
-  if (length(unknown) > 0) {
-    cat(paste(c(
-      "error: the following entries in config are not known:", unknown, "\n"
-    )))
-    errors <- errors + 1
-  }
-
-  for (name in required) {
-    value <- config[name]
-    if (is.null(value))
-      next
-    if (length(config[name]) == 0) {
-      cat(paste("error: config entry for", name, "is empty\n"))
-      errors <- errors + 1
-    }
-  }
-
-  for (num_field in c("max_conn", "max_samples_per_call")) {
-    value <- config[name]
-    if (is.null(value))
-      next
-    value <- suppressWarnings(as.integer(value));
-    if (is.na(value)) {
-      cat(paste(
-        "error: config entry for", num_filed, "is not an integer number\n"
-      ))
-      errors <- errors + 1
-      next
-    }
-    config[num_field] <- value
-  }
-  if (errors > 0)
-    stop("config not valid")
-}
-
-check_config <- function(config_file) {
-  config <- read_yaml(file = config_file)
-  check_raw_data_upload_config(config$raw_data_upload)
-}
-
 
 parser <- argparse::ArgumentParser()
 parser$add_argument(
@@ -1405,5 +1344,4 @@ parser$add_argument(
 args <- parser$parse_args()
 args[["script_name"]] <- "export_spsp_submission.R"
 
-check_config(args$config)
 main(args = args)

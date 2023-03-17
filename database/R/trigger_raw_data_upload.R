@@ -5,16 +5,18 @@ source("R/logger.R")
 
 SSH <- Sys.which("ssh")
 
-upload_raw_data_files <- function(samples, date, config) {
+
+upload_raw_data <- function(samples, date, config_file="raw-data-upload.yml") {
 
     log <- function(msg) {
-        print(
-            log.info(
-                msg=msg,
-                fcn="trigger_upload_on_euler::upload_raw_data_files"
-            )
-        )
+        print(log.info(
+            msg = msg,
+            fcn = "trigger_raw_data_upload::upload_raw_data"
+        ))
     }
+
+    config <- read_yaml(file = config_file)
+    check_config(config)
 
     max_conn <- config$max_conn
     max_samples_per_call <- config$max_samples_per_call
@@ -26,12 +28,13 @@ upload_raw_data_files <- function(samples, date, config) {
 
     n_chunks <- ceiling(n_samples / max_samples_per_call)
 
-    log(paste("start upload of raw data files of",
-              n_samples,
-              "files in",
-              n_chunks,
-              "chunks")
-    )
+    log(paste(
+        "start upload of raw data files of",
+        n_samples,
+        "files in",
+        n_chunks,
+        "chunks"
+    ))
 
     chunks <- split(1:n_samples, (1:n_samples) %% n_chunks)
     pids <- rep(-1, max_conn);
@@ -77,7 +80,63 @@ upload_raw_data_files <- function(samples, date, config) {
 }
 
 
+check_config <- function(config) {
 
+  required <- c(
+    "server", "user", "uploads_folder", "private_key_euler",
+    "passphrase", "max_conn", "max_samples_per_call"
+  )
+
+  missing <- setdiff(required, names(config))
+  unknown <- setdiff(names(config), required)
+
+  errors <- 0
+  if (length(missing) > 0) {
+    cat(paste(c(
+      "error: the following entries in raw-data config are missing:",
+      missing,
+      "\n"
+    )))
+    errors <- errors + 1
+  }
+  if (length(unknown) > 0) {
+    cat(paste(c(
+      "error: the following entries in raw-data config are not known:",
+      unknown,
+      "\n"
+    )))
+    errors <- errors + 1
+  }
+
+  for (name in required) {
+    value <- config[name]
+    if (is.null(value))
+      next
+    if (length(config[name]) == 0) {
+      cat(paste("error: raw-data config entry for", name, "is empty\n"))
+      errors <- errors + 1
+    }
+  }
+
+  for (num_field in c("max_conn", "max_samples_per_call")) {
+    value <- config[name]
+    if (is.null(value))
+      next
+    value <- suppressWarnings(as.integer(value));
+    if (is.na(value)) {
+      cat(paste(
+        "error: raw-data config entry for",
+        num_filed,
+        "is not an integer number\n"
+      ))
+      errors <- errors + 1
+      next
+    }
+    config[num_field] <- value
+  }
+  if (errors > 0)
+    stop("raw-data config not valid")
+}
 
 
 spawn_ssh_process <- function(config, date, samples)
