@@ -13,6 +13,7 @@ for component in \
     nextclade_importer \
     owid_global_cases_importer \
     pangolin_lineage_importer \
+    pangolin_lineage_exporter \
     polybox_updater \
     sequence_diagnostic_importer \
     viollier_metadata_receiver
