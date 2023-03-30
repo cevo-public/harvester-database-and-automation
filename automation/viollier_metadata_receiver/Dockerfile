@@ -7,7 +7,6 @@ RUN apt-get update && apt-get -y upgrade
 RUN apt-get install -y cifs-utils
 RUN apt-get install -y libpq-dev
 RUN apt-get -y install sudo
-RUN yes | sudo DEBIAN_FRONTEND=noninteractive  apt-get install -yqq davfs2
 
 COPY ./database/python/viollier/requirements.txt .
 RUN pip3 install -r requirements.txt

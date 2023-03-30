@@ -170,7 +170,7 @@ class DatabaseConnector(object):
         sequencing_center = sample_data[col_dict["seq_center"]]
 
         insertSql =f"\
-            insert into extraction_plate (extraction_plate_name, left_lab_or_received_metadata_date, sequencing_center, comment)\
+            insert into plates (extraction_plate_name, left_lab_or_received_metadata_date, sequencing_center, comment)\
             values ('{extraction_plate_name}', '{left_lab_or_received_metadata_date}', '{sequencing_center}',\
             'The left_viollier_date might be inaccurate. It contains the date when we received the file which might not be the same date when the plate was extracted and sent.')\
             on conflict do nothing;\

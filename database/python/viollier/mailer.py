@@ -2,11 +2,15 @@ import smtplib, ssl, json, os
 import pandas as pd
 from exceptions import *
 
-EMAILS_SENDER_SMTP_USERNAME=os.environ['SMTP_USER']
-EMAILS_SENDER_SMTP_PASSWORD=os.environ['SMTP_PASSWORD']
-EMAILS_SENDER_EMAIL=os.environ['EMAIL_ADDRESS']
-EMAILS_SENDER_SMTP_HOST=os.environ['SMTP_HOST']
-EMAILS_SENDER_SMTP_PORT=os.environ['SMTP_PORT']
+SEND_EMAILS = eval(os.environ.get('SEND_EMAILS', 'False'))
+
+if SEND_EMAILS:
+    EMAILS_SENDER_SMTP_USERNAME=os.environ['SMTP_USER']
+    EMAILS_SENDER_SMTP_PASSWORD=os.environ['SMTP_PASSWORD']
+    EMAILS_SENDER_EMAIL=os.environ['EMAIL_ADDRESS']
+    EMAILS_SENDER_SMTP_HOST=os.environ['SMTP_HOST']
+    EMAILS_SENDER_SMTP_PORT=os.environ['SMTP_PORT']
+
 admin_receiver_email = os.environ['ADMIN_EMAILS']
 meta_receiver_email = os.environ['META_EMAILS']
 
@@ -14,42 +18,46 @@ class Mailer():
     def __init__(self):
         pass
     def __repr__(self):
-        return (f"using {EMAILS_SENDER_SMTP_HOST}:{EMAILS_SENDER_SMTP_PORT} from {EMAILS_SENDER_EMAIL} as {EMAILS_SENDER_SMTP_USERNAME}")
+        if SEND_EMAILS:
+            return (f"using {EMAILS_SENDER_SMTP_HOST}:{EMAILS_SENDER_SMTP_PORT} from {EMAILS_SENDER_EMAIL} as {EMAILS_SENDER_SMTP_USERNAME}")
+        else:
+            return (f"sending emails is deactivated")
     
     def send_mail(self, receiver_email, subject, message_text, attachment=None):
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
-        from email.mime.base import MIMEBase
-        from email import encoders
+        if SEND_EMAILS:
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
+            from email.mime.base import MIMEBase
+            from email import encoders
 
 
 
-        message = MIMEMultipart()
-        message['From'] = EMAILS_SENDER_EMAIL
-        message['To'] = receiver_email
-        message['Subject'] = subject
-        message.attach(MIMEText(message_text, 'plain'))
+            message = MIMEMultipart()
+            message['From'] = EMAILS_SENDER_EMAIL
+            message['To'] = receiver_email
+            message['Subject'] = subject
+            message.attach(MIMEText(message_text, 'plain'))
 
-        if not attachment == None:
-            attach_file_name = attachment
-            attach_file = open(attach_file_name, 'rb') # Open the file as binary mode
-            payload = MIMEBase('application', 'octate-stream')
-            payload.set_payload((attach_file).read())
-            encoders.encode_base64(payload) #encode the attachment
-            #add payload header with filename
-            payload.add_header('Content-Disposition', f"attachment; filename={attach_file_name}")
-            message.attach(payload)
+            if not attachment == None:
+                attach_file_name = attachment
+                attach_file = open(attach_file_name, 'rb') # Open the file as binary mode
+                payload = MIMEBase('application', 'octate-stream')
+                payload.set_payload((attach_file).read())
+                encoders.encode_base64(payload) #encode the attachment
+                #add payload header with filename
+                payload.add_header('Content-Disposition', f"attachment; filename={attach_file_name}")
+                message.attach(payload)
 
 
 
-        context = ssl.create_default_context()
-        with smtplib.SMTP(EMAILS_SENDER_SMTP_HOST, EMAILS_SENDER_SMTP_PORT) as server:
-            server.ehlo()  # Can be omitted
-            server.starttls(context=context)
-            server.ehlo()  # Can be omitted
-            server.login(EMAILS_SENDER_SMTP_USERNAME, EMAILS_SENDER_SMTP_PASSWORD)
-            text = message.as_string()
-            server.sendmail(EMAILS_SENDER_EMAIL, receiver_email.split(','), text)
+            context = ssl.create_default_context()
+            with smtplib.SMTP(EMAILS_SENDER_SMTP_HOST, EMAILS_SENDER_SMTP_PORT) as server:
+                server.ehlo()  # Can be omitted
+                server.starttls(context=context)
+                server.ehlo()  # Can be omitted
+                server.login(EMAILS_SENDER_SMTP_USERNAME, EMAILS_SENDER_SMTP_PASSWORD)
+                text = message.as_string()
+                server.sendmail(EMAILS_SENDER_EMAIL, receiver_email.split(','), text)
 
     def send_correct_meta_error(self, file_name):
         def create_email_text(file_name):

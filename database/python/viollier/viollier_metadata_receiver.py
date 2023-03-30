@@ -1,12 +1,33 @@
-import sys, os
+import os
+from os import environ
+from pathlib import Path
+
+from webdav3.client import Client
+
 from database_connector import DatabaseConnector
 from mailer import Mailer
 from parser import Parser
 
-#pangolin path to locate meta data
-VIOLLIER_METADATA_ROOTPATH = os.environ['VIOLLIER_METADATA_PATH']
-POLYBOX_PATH = f"{os.environ['POLYBOX_METADATA_PATH']}/Shared"
+for variable in ('VIOLLIER_METADATA_PATH', 'POLYBOX_METADATA_PATH', 'POLYBOX_USER', 'POLYBOX_PASSWORD'):
+    if variable not in environ:
+        raise Exception(F"Setup the required environment variable: {variable}")
 
+#pangolin path to locate meta data
+VIOLLIER_METADATA_ROOTPATH = environ['VIOLLIER_METADATA_PATH']
+POLYBOX_PATH = f"{environ['POLYBOX_METADATA_PATH']}/Shared"
+
+WEBDAV3_CLIENT_OPTIONS = {
+    'webdav_hostname': environ['WEBDAV_BASE_URL'],
+    'webdav_login': environ['POLYBOX_USER'],
+    'webdav_password': environ['POLYBOX_PASSWORD'],
+}
+
+LAB_DIR_LIST = ('ETHZ-IMV', 'ETHZ-TeamW', 'ETHZ-EOC')
+
+client = Client(WEBDAV3_CLIENT_OPTIONS)
+
+for lab_dir in LAB_DIR_LIST:
+    os.makedirs(os.path.join(POLYBOX_PATH, lab_dir, 'metadata'), exist_ok=True)
 
 def get_lab_name(filepath):
     if VIOLLIER_METADATA_ROOTPATH in filepath:
@@ -61,10 +82,10 @@ def process_viollier():
     return len(file_list_to_process)
 
 def process_polybox():
-    dir_list = ["ETHZ-IMV (2)", "ETHZ-TeamW (2)", "ETHZ-EOC (2)"]
-    for lab in dir_list:
-        metadata_path = os.path.join(POLYBOX_PATH, lab, 'metadata')
-        file_list_total = [(f.path.split('/')[-1], f.path) for f in os.scandir(metadata_path) if not f.is_dir()]
+    for lab in LAB_DIR_LIST:
+        local_metadata_path = os.path.join(POLYBOX_PATH, lab, 'metadata')
+        remote_metadata_path = os.path.join('Shared', lab, 'metadata')
+        file_list_total = [(f, f"{local_metadata_path}/{f}") for f in client.list(remote_metadata_path)[1:]]
         file_list_sanitised = [f for f in file_list_total if is_valid_file(f[0],f[1])]
         file_list_processed = []
         file_list_inprocessing = []
@@ -77,7 +98,13 @@ def process_polybox():
             file_list_to_process = file_list_sanitised
         if len(file_list_to_process) > 0:
             for metadata_file_tuple in file_list_to_process:
-                process_file(metadata_file_tuple, get_lab_name(metadata_file_tuple[1]))
+                try:
+                    client.download_sync(remote_path=f"{remote_metadata_path}/{metadata_file_tuple[0]}",
+                                         local_path=metadata_file_tuple[1])
+                    process_file(metadata_file_tuple, get_lab_name(metadata_file_tuple[1]))
+                finally:
+                    Path(metadata_file_tuple[1]).unlink(missing_ok=True)
+
     return len(file_list_to_process)
 
 def parse_meta_data(file_tuple, labname):
@@ -114,7 +141,7 @@ def handle_error(file_to_process, labname):
         isNewError = db_connector.add_error_file(file_to_process)
 
     if isNewError:
-        mailer = Mailer()     
+        mailer = Mailer()
         mailer.send_error_file(file_to_process, labname)
 
     
