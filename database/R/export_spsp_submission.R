@@ -525,7 +525,7 @@ get_sample_metadata <- function(db_connection, args, samples,
   query_seqs <- dplyr::tbl(db_connection, "consensus_sequence") %>%
     filter(sample_name %in% !!samples$sample_name) %>%
     select(sample_name, sequencing_plate, sequencing_plate_well,
-           sequencing_center, sequencing_batch, ethid) %>%
+           sequencing_center, sequencing_batch, ethid, primer_kit) %>%
     collect()
   query_seqs_additional <-
     dplyr::tbl(db_connection, "consensus_sequence_meta") %>%
@@ -890,16 +890,7 @@ format_metadata_for_spsp <- function(metadata, args) {
       host_sex = "Unknown",
       host_age = "Unknown",
       isolation_source_detailed = "Respiratory specimen",
-      library_preparation_kit = case_when(
-        sequencing_center == "viollier" ~ "Illumina_COVIDSeq (ARTIC V4)",
-        sequencing_center == "gfb" ~ "NEB (ARTIC V3)",
-        sequencing_center == "h2030" ~ "Illumina_COVIDSeq (ARTIC V4)",
-        sequencing_center == "fgcz" ~ "Nextera XT (ARTIC V4)",
-        sequencing_center == "fgcz" & as.Date(
-          gsub(sequencing_batch, pattern = "_.*", replacement = ""),
-          format = "%Y%m%d"
-        ) < as.Date("2021-04-19") ~ "NEB"
-      ),
+      library_preparation_kit = primer_kit,
       sequencing_platform =
         "Combination Illumina MiSeq and Illumina NovaSeq 5000/6000",
       assembly_method = "V-pipe",
