@@ -9,7 +9,6 @@ for component in \
     bag_meldeformular_dashboard_importer \
     gisaid_importer \
     gisaid_api_importer \
-    java \
     nextclade_importer \
     owid_global_cases_importer \
     pangolin_lineage_importer \
@@ -34,6 +33,6 @@ do
     /kaniko/executor \
         --context ${CI_PROJECT_DIR}/automation/$component \
         --dockerfile ${CI_PROJECT_DIR}/automation/$component/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE:$component-$CI_COMMIT_TAG \
+        --destination $CI_REGISTRY_IMAGE:$component-$CI_COMMIT_TAG
 
 done
