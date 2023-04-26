@@ -15,6 +15,7 @@ for component in \
     pangolin_lineage_exporter \
     polybox_updater \
     sequence_diagnostic_importer \
+    spsp_exporter \
     viollier_metadata_receiver
 do
     echo .
