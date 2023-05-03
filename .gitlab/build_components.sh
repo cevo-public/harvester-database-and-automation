@@ -34,6 +34,7 @@ do
     /kaniko/executor \
         --context ${CI_PROJECT_DIR}/automation/$component \
         --dockerfile ${CI_PROJECT_DIR}/automation/$component/Dockerfile \
-        --destination $CI_REGISTRY_IMAGE:$component-$CI_COMMIT_TAG
+        --destination $CI_REGISTRY_IMAGE:$component-$CI_COMMIT_TAG \
+        --cleanup
 
 done
